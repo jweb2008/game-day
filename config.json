@@ -1,0 +1,11 @@
+{
+  "port": 80,
+  "delaySeconds": 12,
+  "pollSeconds": 5,
+  "idlePollSeconds": 60,
+  "teams": [
+    { "league": "nhl", "sport": "hockey", "abbr": "BOS", "name": "Bruins" },
+    { "league": "nfl", "sport": "football", "abbr": "NE", "name": "Patriots" },
+    { "league": "nfl", "sport": "football", "abbr": "KC", "name": "Chiefs" }
+  ]
+}

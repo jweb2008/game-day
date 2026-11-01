@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Day status</title>
+<style>
+  :root { --bg: #0b0f17; --card: #151b27; --line: #263044; --text: #e8edf5; --muted: #8b97ab; --good: #3fbf7f; --warn: #e3a72f; --bad: #e5484d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin-bottom: 20px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; flex: 1 1 320px; }
+  .game .teams { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; margin: 10px 0; }
+  .team { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .team img { width: 36px; height: 36px; object-fit: contain; }
+  .swatch { width: 10px; height: 28px; border-radius: 3px; }
+  .score { font-size: 28px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+  .pre { background: #233047; color: #9fb5d9; } .in { background: #123d2a; color: var(--good); } .post { background: #3a2a14; color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 6px 4px; border-top: 1px solid var(--line); }
+  .ok { color: var(--good); } .err { color: var(--bad); }
+  .empty { color: var(--muted); }
+</style>
+</head>
+<body>
+  <h1>Game Day: status</h1>
+  <div class="sub" id="summary">Connecting…</div>
+  <div class="row" id="games"></div>
+  <div class="row" style="margin-top:16px">
+    <div class="card"><strong>Feed</strong><div id="feed" class="meta">…</div></div>
+    <div class="card"><strong>Recent events</strong> <span class="meta">(what the lights and takeovers will react to)</span><table id="events"></table></div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ago = (iso) => (iso ? `${Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000))}s ago` : 'never');
+
+  function teamRow(t, possession) {
+    if (!t) return '';
+    const ball = possession && possession === t.id ? ' 🏈' : '';
+    return `<div class="team"><span class="swatch" style="background:${t.color || '#555'}"></span>` +
+      (t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.remove()">` : '') +
+      `<span>${esc(t.name)}${ball} <span class="meta">${esc(t.record || '')}</span></span></div>` +
+      `<div class="score">${t.score}</div>`;
+  }
+
+  function renderGames(state) {
+    const games = Object.entries(state.games || {});
+    if (state.buffering) { $('games').innerHTML = `<div class="card empty">Filling the ${state.delaySeconds}s delay buffer…</div>`; return; }
+    if (!games.length) { $('games').innerHTML = '<div class="card empty">No games posted for the teams you follow.</div>'; return; }
+    $('games').innerHTML = games.map(([follow, g]) => `
+      <div class="card game">
+        <span class="pill ${g.state}">${g.state === 'in' ? 'LIVE' : g.state === 'post' ? 'FINAL' : 'UPCOMING'}</span>
+        <span class="meta">${esc(follow)} · ${esc(g.league.toUpperCase())}</span>
+        <div class="teams">${teamRow(g.away, g.possession)}${teamRow(g.home, g.possession)}</div>
+        <div>${esc(g.detail)}${g.downDistance ? ` · ${esc(g.downDistance)}` : ''}</div>
+        ${g.lastPlay ? `<div class="meta">${esc(g.lastPlay)}</div>` : ''}
+        <div class="meta">${g.state === 'pre' && g.start ? new Date(g.start).toLocaleString() : ''}${g.broadcast ? ` · ${esc(g.broadcast)}` : ''}</div>
+      </div>`).join('');
+  }
+
+  function connect() {
+    const es = new EventSource('/stream');
+    es.addEventListener('state', (e) => {
+      const s = JSON.parse(e.data);
+      $('summary').textContent = `Showing data ${s.delaySeconds}s behind the live feed, to match your TV.`;
+      renderGames(s);
+    });
+    es.onerror = () => { $('summary').textContent = 'Lost connection to the server, retrying…'; };
+  }
+
+  async function refreshStatus() {
+    try {
+      const s = await (await fetch('/api/status')).json();
+      $('feed').innerHTML =
+        `Last feed read: ${ago(s.liveAt)}<br>Screens connected: ${s.screens}<br>` +
+        `Following: ${s.teams.map((t) => esc(t.name)).join(', ')}<br>` +
+        (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>');
+      $('events').innerHTML = s.events.length
+        ? s.events.map((e) => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.follow)}</td><td>${esc(e.type)}${e.type === 'score' ? ` ${esc(e.team)} +${e.points}` : ''}${e.type === 'final' ? ` (winner ${esc(e.winner || '?')})` : ''}</td></tr>`).join('')
+        : '<tr><td class="empty">None yet. Scores, starts and finals show here.</td></tr>';
+    } catch { $('feed').innerHTML = '<span class="err">Server not answering</span>'; }
+  }
+
+  connect();
+  refreshStatus();
+  setInterval(refreshStatus, 5000);
+</script>
+</body>
+</html>
