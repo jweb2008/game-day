@@ -24,49 +24,55 @@
     font-family: var(--font);
     font-weight: 600;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
     transition: background 1.2s ease;
   }
+  /* The portrait screen. On a TV that outputs landscape but hangs sideways, it is turned to fit. */
+  #app {
+    position: absolute; top: 0; left: 0;
+    width: 100vmin; height: 100vmax;
+    display: flex; flex-direction: column;
+  }
+  body.turn-right #app { left: 100vw; transform-origin: top left; transform: rotate(90deg); }
+  body.turn-left #app { top: 100vh; transform-origin: top left; transform: rotate(-90deg); }
 
   .status {
     display: flex; justify-content: space-between; align-items: baseline;
-    padding: 4vw 5vw 3vw;
-    font-size: 6.5vw; line-height: 1;
+    padding: 4vmin 5vmin 3vmin;
+    font-size: 6.5vmin; line-height: 1;
   }
   .status .when { font-weight: 800; }
   .status .live::before {
-    content: ''; display: inline-block; width: 2.6vw; height: 2.6vw; border-radius: 50%;
-    background: #ff4d4d; margin-right: 2vw; vertical-align: 0.6vw;
+    content: ''; display: inline-block; width: 2.6vmin; height: 2.6vmin; border-radius: 50%;
+    background: #ff4d4d; margin-right: 2vmin; vertical-align: 0.6vmin;
   }
-  .status .tv { color: var(--muted); font-size: 5vw; }
+  .status .tv { color: var(--muted); font-size: 5vmin; }
 
   .team {
     position: relative;
     display: grid;
-    grid-template-columns: 22vw 1fr auto;
+    grid-template-columns: 22vmin 1fr auto;
     align-items: center;
-    gap: 4vw;
-    padding: 4vw 6vw 4vw 5vw;
-    min-height: 34vw;
+    gap: 4vmin;
+    padding: 4vmin 6vmin 4vmin 5vmin;
+    min-height: 34vmin;
     background: var(--band);
     color: var(--band-ink);
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
   }
-  .team.home { clip-path: polygon(0 0, 100% 3vw, 100% 100%, 0 100%); margin-top: -1vw; }
-  .team.away { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 3vw)); }
+  .team.home { clip-path: polygon(0 0, 100% 3vmin, 100% 100%, 0 100%); margin-top: -1vmin; }
+  .team.away { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 3vmin)); }
   .team.lost { filter: saturate(0.35) brightness(0.7); }
-  .team img { width: 22vw; height: 22vw; object-fit: contain; filter: drop-shadow(0 0.6vw 0.8vw rgba(0,0,0,.35)); }
+  .team img { width: 22vmin; height: 22vmin; object-fit: contain; filter: drop-shadow(0 0.6vmin 0.8vmin rgba(0,0,0,.35)); }
   .team .who { display: flex; flex-direction: column; min-width: 0; }
-  .team .city { font-size: 4.6vw; font-weight: 500; opacity: .85; line-height: 1; }
-  .team .name { font-size: 10vw; font-weight: 800; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .team .record { font-size: 4.4vw; font-weight: 500; opacity: .8; margin-top: 1vw; }
+  .team .city { font-size: 4.6vmin; font-weight: 500; opacity: .85; line-height: 1; }
+  .team .name { font-size: 10vmin; font-weight: 800; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .record { font-size: 4.4vmin; font-weight: 500; opacity: .8; margin-top: 1vmin; }
   .team .score {
-    font-size: 26vw; font-weight: 800; line-height: .8;
+    font-size: 26vmin; font-weight: 800; line-height: .8;
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
   }
   .team .ball {
-    position: absolute; left: 0; top: 12%; bottom: 12%; width: 1.6vw;
+    position: absolute; left: 0; top: 12%; bottom: 12%; width: 1.6vmin;
     background: var(--band-ink); opacity: 0; transition: opacity .4s;
   }
   .team.has-ball .ball { opacity: 1; }
@@ -74,35 +80,35 @@
   @keyframes scored { 0% { transform: scale(1); } 25% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
   .situation {
-    margin: 5vw 5vw 0; padding: 3.5vw 4vw;
-    font-size: 8vw; font-weight: 800; line-height: 1.05;
-    border-left: 1.6vw solid var(--accent);
+    margin: 5vmin 5vmin 0; padding: 3.5vmin 4vmin;
+    font-size: 8vmin; font-weight: 800; line-height: 1.05;
+    border-left: 1.6vmin solid var(--accent);
     background: rgba(255,255,255,.05);
   }
   .situation.red-zone { border-left-color: #ff4d4d; }
-  .situation small { display: block; font-size: 4.6vw; font-weight: 500; color: var(--muted); margin-top: 1.2vw; }
+  .situation small { display: block; font-size: 4.6vmin; font-weight: 500; color: var(--muted); margin-top: 1.2vmin; }
 
-  table.lines { margin: 6vw 5vw 0; border-collapse: collapse; font-size: 5.4vw; width: calc(100% - 10vw); }
-  .lines th { color: var(--muted); font-weight: 500; padding: 0 0 1.5vw; text-align: center; }
+  table.lines { margin: 6vmin 5vmin 0; border-collapse: collapse; font-size: 5.4vmin; width: calc(100% - 10vmin); }
+  .lines th { color: var(--muted); font-weight: 500; padding: 0 0 1.5vmin; text-align: center; }
   .lines th:first-child, .lines td:first-child { text-align: left; width: 22%; }
-  .lines td { padding: 1.6vw 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
+  .lines td { padding: 1.6vmin 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
   .lines td:last-child, .lines th:last-child { font-weight: 800; color: var(--ink); }
 
   .play {
-    margin: 6vw 5vw 0; font-size: 5.2vw; font-weight: 500; line-height: 1.25;
+    margin: 6vmin 5vmin 0; font-size: 5.2vmin; font-weight: 500; line-height: 1.25;
     color: var(--ink); opacity: .92;
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
   }
 
-  .countdown { margin: 8vw 5vw 0; }
-  .countdown .big { font-size: 17vw; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
-  .countdown .sub { font-size: 5.4vw; color: var(--muted); margin-top: 2vw; font-weight: 500; }
+  .countdown { margin: 8vmin 5vmin 0; }
+  .countdown .big { font-size: 17vmin; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+  .countdown .sub { font-size: 5.4vmin; color: var(--muted); margin-top: 2vmin; font-weight: 500; }
 
   .spacer { flex: 1; }
-  .foot { padding: 3vw 5vw; font-size: 3.2vw; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
+  .foot { padding: 3vmin 5vmin; font-size: 3.2vmin; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
   .foot .bad { color: #ff8a8a; }
 
-  .empty { margin: auto 6vw; font-size: 7vw; font-weight: 600; line-height: 1.15; color: var(--muted); }
+  .empty { margin: auto 6vmin; font-size: 7vmin; font-weight: 600; line-height: 1.15; color: var(--muted); }
 
   @media (prefers-reduced-motion: reduce) {
     body { transition: none; }
@@ -118,6 +124,17 @@
   const params = new URLSearchParams(location.search);
   const wanted = (params.get('team') || '').toUpperCase();
   const app = document.getElementById('app');
+
+  // ?turn=right or ?turn=left for a sideways-hung TV; ?turn=none to never turn.
+  // With no setting, a landscape window is turned right automatically.
+  function applyTurn() {
+    const turn = (params.get('turn') || '').toLowerCase();
+    const landscape = window.innerWidth > window.innerHeight;
+    document.body.classList.toggle('turn-right', turn === 'right' || (!turn && landscape));
+    document.body.classList.toggle('turn-left', turn === 'left');
+  }
+  applyTurn();
+  window.addEventListener('resize', applyTurn);
   let state = null;
   let lastScores = {};
   let online = false;
@@ -147,7 +164,7 @@
   // Readable text on any team color.
   function inkFor(hex) {
     if (!hex) return '#f5f3ee';
-    return luminance(hex) > 0.45 ? '#111418' : '#f5f3ee';
+    return luminance(hex) > 0.3 ? '#111418' : '#f5f3ee';
   }
 
   function darken(hex, amount) {
@@ -242,7 +259,6 @@
     const featured = [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
-    app.style.display = 'contents';
     app.innerHTML =
       statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + middle(g) +
       `<div class="spacer"></div><footer class="foot"><span>${online ? `Matched to your TV, ${state.delaySeconds}s behind live` : '<span class="bad">Reconnecting to Game Day…</span>'}</span></footer>`;
