@@ -32,6 +32,7 @@
     width: 100vmin; height: 100vmax;
     display: flex; flex-direction: column;
   }
+  #app > * { flex-shrink: 0; }
   body.turn-right #app { left: 100vw; transform-origin: top left; transform: rotate(90deg); }
   body.turn-left #app { top: 100vh; transform-origin: top left; transform: rotate(-90deg); }
 
@@ -50,11 +51,11 @@
   .team {
     position: relative;
     display: grid;
-    grid-template-columns: 22vmin 1fr auto;
+    grid-template-columns: 16vmin 1fr auto;
     align-items: center;
     gap: 4vmin;
-    padding: 4vmin 6vmin 4vmin 5vmin;
-    min-height: 34vmin;
+    padding: 3vmin 6vmin 3vmin 5vmin;
+    min-height: 25vmin;
     background: var(--band);
     color: var(--band-ink);
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
@@ -62,13 +63,13 @@
   .team.home { clip-path: polygon(0 0, 100% 3vmin, 100% 100%, 0 100%); margin-top: -1vmin; }
   .team.away { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 3vmin)); }
   .team.lost { filter: saturate(0.35) brightness(0.7); }
-  .team img { width: 22vmin; height: 22vmin; object-fit: contain; filter: drop-shadow(0 0.6vmin 0.8vmin rgba(0,0,0,.35)); }
+  .team img { width: 16vmin; height: 16vmin; object-fit: contain; filter: drop-shadow(0 0.6vmin 0.8vmin rgba(0,0,0,.35)); }
   .team .who { display: flex; flex-direction: column; min-width: 0; }
   .team .city { font-size: 4.6vmin; font-weight: 500; opacity: .85; line-height: 1; }
-  .team .name { font-size: 10vmin; font-weight: 800; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .name { font-size: 9vmin; font-weight: 800; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .team .record { font-size: 4.4vmin; font-weight: 500; opacity: .8; margin-top: 1vmin; }
   .team .score {
-    font-size: 26vmin; font-weight: 800; line-height: .8;
+    font-size: 20vmin; font-weight: 800; line-height: .8;
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
   }
   .team .ball {
@@ -80,25 +81,36 @@
   @keyframes scored { 0% { transform: scale(1); } 25% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
   .situation {
-    margin: 5vmin 5vmin 0; padding: 3.5vmin 4vmin;
-    font-size: 8vmin; font-weight: 800; line-height: 1.05;
+    margin: 3.5vmin 5vmin 0; padding: 2vmin 3.5vmin;
+    font-size: 6.2vmin; font-weight: 800; line-height: 1.05;
     border-left: 1.6vmin solid var(--accent);
     background: rgba(255,255,255,.05);
   }
   .situation.red-zone { border-left-color: #ff4d4d; }
   .situation small { display: block; font-size: 4.6vmin; font-weight: 500; color: var(--muted); margin-top: 1.2vmin; }
 
-  table.lines { margin: 6vmin 5vmin 0; border-collapse: collapse; font-size: 5.4vmin; width: calc(100% - 10vmin); }
+  table.lines { margin: 3vmin 5vmin 4vmin; border-collapse: collapse; font-size: 4.6vmin; width: calc(100% - 10vmin); }
   .lines th { color: var(--muted); font-weight: 500; padding: 0 0 1.5vmin; text-align: center; }
   .lines th:first-child, .lines td:first-child { text-align: left; width: 22%; }
-  .lines td { padding: 1.6vmin 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
+  .lines td { padding: 1.1vmin 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
   .lines td:last-child, .lines th:last-child { font-weight: 800; color: var(--ink); }
 
   .play {
-    margin: 6vmin 5vmin 0; font-size: 5.2vmin; font-weight: 500; line-height: 1.25;
-    color: var(--ink); opacity: .92;
-    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    margin: 2.4vmin 5vmin 0; font-size: 4.4vmin; font-weight: 500; line-height: 1.25;
+    color: var(--muted);
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
   }
+
+  .stats { margin: 3vmin 5vmin 0; display: flex; flex-direction: column; gap: 1.6vmin; }
+  .stat { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; row-gap: 0.9vmin; }
+  .stat .v { font-size: 5vmin; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat .v.home { text-align: right; }
+  .stat .label { font-size: 3.8vmin; font-weight: 500; color: var(--muted); text-align: center; padding: 0 2vmin; }
+  /* Two bars that grow out from the middle, like a tug of war. */
+  .stat .bar { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8vmin; height: 1.2vmin; }
+  .stat .bar span { background: rgba(255,255,255,.08); display: flex; }
+  .stat .bar span:first-child { justify-content: flex-end; }
+  .stat .bar i { display: block; height: 100%; }
 
   .countdown { margin: 8vmin 5vmin 0; }
   .countdown .big { font-size: 17vmin; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
@@ -183,10 +195,28 @@
     return n > 4 ? 'OT' : ['1st', '2nd', '3rd', '4th'][n - 1] || '';
   }
 
+  // Near-black team colors vanish on the dark field; use the team's second color instead.
+  function bandColor(t) {
+    if (!t) return '#2a3342';
+    return (t.color && luminance(t.color) > 0.02) ? t.color : (t.altColor || t.color || '#2a3342');
+  }
+
+  // Away on the left, home on the right; each bar grows out from the middle in team color.
+  function statBars(g) {
+    const rows = g.stats || [];
+    if (!rows.length) return '';
+    const ac = bandColor(g.away), hc = bandColor(g.home);
+    return '<div class="stats">' + rows.map((r) => {
+      const max = Math.max(r.awayAmount, r.homeAmount) || 1;
+      const aw = Math.round((r.awayAmount / max) * 100), hw = Math.round((r.homeAmount / max) * 100);
+      return `<div class="stat"><span class="v">${esc(r.away)}</span><span class="label">${esc(r.label)}</span><span class="v home">${esc(r.home)}</span>` +
+        `<div class="bar"><span><i style="width:${aw}%;background:${ac}"></i></span><span><i style="width:${hw}%;background:${hc}"></i></span></div></div>`;
+    }).join('') + '</div>';
+  }
+
   function teamBand(t, side, g) {
     if (!t) return '';
-    // Near-black team colors vanish on the dark field; use the team's second color instead.
-    const band = (t.color && luminance(t.color) > 0.02) ? t.color : (t.altColor || t.color || '#2a3342');
+    const band = bandColor(t);
     const lost = g.state === 'post' && !t.winner && [g.home, g.away].some((x) => x && x.winner);
     const hasBall = g.state === 'in' && g.possession && g.possession === t.id;
     const city = t.fullName && t.name && t.fullName.endsWith(t.name) ? t.fullName.slice(0, -t.name.length).trim() : '';
@@ -237,6 +267,9 @@
     if (g.state === 'in' && g.downDistance) {
       html += `<div class="situation${g.redZone ? ' red-zone' : ''}">${esc(g.downDistance)}${g.redZone ? '<small>Red zone</small>' : ''}</div>`;
     }
+    if (g.state === 'in' && g.lastPlay) html += `<p class="play">${esc(g.lastPlay)}</p>`;
+    html += statBars(g);
+    html += '<div class="spacer"></div>';
     const away = g.away, home = g.home;
     const n = Math.max(away?.periods?.length || 0, home?.periods?.length || 0);
     if (n) {
@@ -245,7 +278,6 @@
       const row = (t) => `<tr><td>${esc(t.abbr)}</td>${Array.from({ length: n }, (_, i) => `<td>${t.periods[i] ?? ''}</td>`).join('')}<td>${t.score}</td></tr>`;
       html += `<table class="lines"><thead><tr><th></th>${head}<th>T</th></tr></thead><tbody>${row(away)}${row(home)}</tbody></table>`;
     }
-    if (g.state === 'in' && g.lastPlay) html += `<p class="play">${esc(g.lastPlay)}</p>`;
     return html;
   }
 
@@ -264,7 +296,7 @@
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
     app.innerHTML =
       statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + middle(g) +
-      `<div class="spacer"></div><footer class="foot"><span>${online ? `Matched to your TV, ${state.delaySeconds}s behind live` : '<span class="bad">Reconnecting to Game Day…</span>'}</span></footer>`;
+      (g.state === 'pre' ? '<div class="spacer"></div>' : '') + (online ? '' : '<footer class="foot"><span class="bad">Reconnecting to Game Day…</span></footer>');
   }
 
   function connect() {

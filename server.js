@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { fetchScoreboard, fetchTeamSchedule, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
+const { fetchSummary, pickStats } = require('./lib/stats');
 
 const ROOT = __dirname;
 const LOCAL_CONFIG = path.join(ROOT, 'config.local.json'); // per-house settings, never in git
@@ -85,8 +86,38 @@ async function pollOnce() {
       for (const abbr of lg.abbrs) if (live.games[abbr]) games[abbr] = live.games[abbr];
     }
   }
+  await addStats(games);
   live = { at: new Date().toISOString(), games };
   buffer.push(live);
+}
+
+// Box score stats for games that have started. Refreshed every 10s while live, once more at the final.
+const statsCache = new Map(); // eventId -> { t, state, stats }
+
+async function addStats(games) {
+  const seen = new Set();
+  for (const game of Object.values(games)) {
+    if (game.state === 'pre' || seen.has(game.id)) {
+      if (game.state !== 'pre') game.stats = statsCache.get(game.id)?.stats || [];
+      continue;
+    }
+    seen.add(game.id);
+    const cached = statsCache.get(game.id);
+    const fresh = cached && (cached.state === 'post' || Date.now() - cached.t < 10000);
+    if (!fresh) {
+      try {
+        const lg = config.teams.find((t) => t.league === game.league);
+        const summary = await fetchSummary(lg.sport, game.league, game.id);
+        statsCache.set(game.id, { t: Date.now(), state: game.state, stats: pickStats(summary, game.league, game.away?.id, game.home?.id) });
+      } catch (err) {
+        console.error('stats error:', err.message);
+      }
+    }
+    game.stats = statsCache.get(game.id)?.stats || [];
+  }
+  // Forget games that have dropped off the board.
+  const current = new Set(Object.values(games).map((g) => g.id));
+  for (const id of statsCache.keys()) if (!current.has(id)) statsCache.delete(id);
 }
 
 function busy() {
