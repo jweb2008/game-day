@@ -22,6 +22,7 @@ bash /opt/game-day/update.sh
 | Path | What it is |
 | --- | --- |
 | `/` | Status page: followed games (delayed), feed health, recent events |
+| `/scoreboard.html` | Portrait scoreboard for a TV; `?team=KC` picks a game, otherwise live, then next, then latest final |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
 | `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`) |

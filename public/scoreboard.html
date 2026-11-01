@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;800&display=swap" rel="stylesheet">
+<style>
+  /* Built for a portrait TV read from across the room: every size is a share of the screen width. */
+  :root {
+    --ink: #f5f3ee;
+    --muted: #a9b1bf;
+    --field: #0d1420;        /* replaced by the featured team's darkened color */
+    --rule: rgba(245, 243, 238, 0.14);
+    --font: 'Barlow Condensed', 'Roboto Condensed', 'sans-serif-condensed', 'Arial Narrow', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--field);
+    color: var(--ink);
+    font-family: var(--font);
+    font-weight: 600;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: background 1.2s ease;
+  }
+
+  .status {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 4vw 5vw 3vw;
+    font-size: 6.5vw; line-height: 1;
+  }
+  .status .when { font-weight: 800; }
+  .status .live::before {
+    content: ''; display: inline-block; width: 2.6vw; height: 2.6vw; border-radius: 50%;
+    background: #ff4d4d; margin-right: 2vw; vertical-align: 0.6vw;
+  }
+  .status .tv { color: var(--muted); font-size: 5vw; }
+
+  .team {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22vw 1fr auto;
+    align-items: center;
+    gap: 4vw;
+    padding: 4vw 6vw 4vw 5vw;
+    min-height: 34vw;
+    background: var(--band);
+    color: var(--band-ink);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+  .team.home { clip-path: polygon(0 0, 100% 3vw, 100% 100%, 0 100%); margin-top: -1vw; }
+  .team.away { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 3vw)); }
+  .team.lost { filter: saturate(0.35) brightness(0.7); }
+  .team img { width: 22vw; height: 22vw; object-fit: contain; filter: drop-shadow(0 0.6vw 0.8vw rgba(0,0,0,.35)); }
+  .team .who { display: flex; flex-direction: column; min-width: 0; }
+  .team .city { font-size: 4.6vw; font-weight: 500; opacity: .85; line-height: 1; }
+  .team .name { font-size: 10vw; font-weight: 800; line-height: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .record { font-size: 4.4vw; font-weight: 500; opacity: .8; margin-top: 1vw; }
+  .team .score {
+    font-size: 26vw; font-weight: 800; line-height: .8;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
+  .team .ball {
+    position: absolute; left: 0; top: 12%; bottom: 12%; width: 1.6vw;
+    background: var(--band-ink); opacity: 0; transition: opacity .4s;
+  }
+  .team.has-ball .ball { opacity: 1; }
+  .score.scored { animation: scored 1.6s ease-out 1; }
+  @keyframes scored { 0% { transform: scale(1); } 25% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+  .situation {
+    margin: 5vw 5vw 0; padding: 3.5vw 4vw;
+    font-size: 8vw; font-weight: 800; line-height: 1.05;
+    border-left: 1.6vw solid var(--accent);
+    background: rgba(255,255,255,.05);
+  }
+  .situation.red-zone { border-left-color: #ff4d4d; }
+  .situation small { display: block; font-size: 4.6vw; font-weight: 500; color: var(--muted); margin-top: 1.2vw; }
+
+  table.lines { margin: 6vw 5vw 0; border-collapse: collapse; font-size: 5.4vw; width: calc(100% - 10vw); }
+  .lines th { color: var(--muted); font-weight: 500; padding: 0 0 1.5vw; text-align: center; }
+  .lines th:first-child, .lines td:first-child { text-align: left; width: 22%; }
+  .lines td { padding: 1.6vw 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
+  .lines td:last-child, .lines th:last-child { font-weight: 800; color: var(--ink); }
+
+  .play {
+    margin: 6vw 5vw 0; font-size: 5.2vw; font-weight: 500; line-height: 1.25;
+    color: var(--ink); opacity: .92;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .countdown { margin: 8vw 5vw 0; }
+  .countdown .big { font-size: 17vw; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+  .countdown .sub { font-size: 5.4vw; color: var(--muted); margin-top: 2vw; font-weight: 500; }
+
+  .spacer { flex: 1; }
+  .foot { padding: 3vw 5vw; font-size: 3.2vw; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
+  .foot .bad { color: #ff8a8a; }
+
+  .empty { margin: auto 6vw; font-size: 7vw; font-weight: 600; line-height: 1.15; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    body { transition: none; }
+    .score.scored { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="empty">Connecting to Game Day…</div></div>
+
+<script>
+  // Which game: ?team=KC, otherwise the live one, else the next one, else the latest final.
+  const params = new URLSearchParams(location.search);
+  const wanted = (params.get('team') || '').toUpperCase();
+  const app = document.getElementById('app');
+  let state = null;
+  let lastScores = {};
+  let online = false;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function pickGame(games) {
+    const list = Object.entries(games);
+    if (wanted) return list.find(([abbr]) => abbr === wanted) || null;
+    const by = (s) => list.filter(([, g]) => g.state === s);
+    const live = by('in');
+    if (live.length) return live[0];
+    const pre = by('pre').sort((a, b) => Date.parse(a[1].start) - Date.parse(b[1].start));
+    if (pre.length) return pre[0];
+    const post = by('post').sort((a, b) => Date.parse(b[1].start) - Date.parse(a[1].start));
+    return post[0] || null;
+  }
+
+  function luminance(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+      v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  // Readable text on any team color.
+  function inkFor(hex) {
+    if (!hex) return '#f5f3ee';
+    return luminance(hex) > 0.45 ? '#111418' : '#f5f3ee';
+  }
+
+  function darken(hex, amount) {
+    if (!hex) return '#0d1420';
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.round(v * amount).toString(16).padStart(2, '0');
+    return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+  }
+
+  function periodName(g) {
+    const n = g.period;
+    if (g.league === 'nhl') return n > 3 ? (n === 4 ? 'OT' : `${n - 3}OT`) : ['1st', '2nd', '3rd'][n - 1] || '';
+    return n > 4 ? 'OT' : ['1st', '2nd', '3rd', '4th'][n - 1] || '';
+  }
+
+  function teamBand(t, side, g) {
+    if (!t) return '';
+    // Near-black team colors vanish on the dark field; use the team's second color instead.
+    const band = (t.color && luminance(t.color) > 0.02) ? t.color : (t.altColor || t.color || '#2a3342');
+    const lost = g.state === 'post' && !t.winner && [g.home, g.away].some((x) => x && x.winner);
+    const hasBall = g.state === 'in' && g.possession && g.possession === t.id;
+    const city = t.fullName && t.name && t.fullName.endsWith(t.name) ? t.fullName.slice(0, -t.name.length).trim() : '';
+    const scored = lastScores[`${g.id}:${t.id}`] !== undefined && lastScores[`${g.id}:${t.id}`] < t.score;
+    lastScores[`${g.id}:${t.id}`] = t.score;
+    return `
+      <section class="team ${side}${lost ? ' lost' : ''}${hasBall ? ' has-ball' : ''}" style="--band:${band};--band-ink:${inkFor(band)}">
+        <span class="ball"></span>
+        ${t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
+        <div class="who">
+          ${city ? `<span class="city">${esc(city)}</span>` : ''}
+          <span class="name">${esc(t.name)}</span>
+          ${t.record ? `<span class="record">${esc(t.record)}</span>` : ''}
+        </div>
+        <div class="score${scored ? ' scored' : ''}">${g.state === 'pre' ? '' : t.score}</div>
+      </section>`;
+  }
+
+  function statusBar(g) {
+    let when;
+    if (g.state === 'in') {
+      const p = periodName(g);
+      const clock = g.clock && g.clock !== '0:00' ? g.clock : '';
+      when = /half/i.test(g.detail) || /end of/i.test(g.detail) || /intermission/i.test(g.detail)
+        ? `<span class="when live">${esc(g.detail)}</span>`
+        : `<span class="when live">${esc(p)} ${esc(clock)}</span>`;
+    } else if (g.state === 'post') {
+      when = `<span class="when">${esc(g.detail || 'Final')}</span>`;
+    } else {
+      const d = new Date(g.start);
+      when = `<span class="when">${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>`;
+    }
+    return `<header class="status">${when}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
+  }
+
+  function middle(g) {
+    if (g.state === 'pre') {
+      const ms = Date.parse(g.start) - Date.now();
+      if (ms > 0 && ms < 7 * 24 * 3600 * 1000) {
+        const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+        const days = Math.floor(h / 24);
+        const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        return `<div class="countdown"><div class="big">${big}</div><div class="sub">until ${g.league === 'nhl' ? 'puck drop' : 'kickoff'}</div></div>`;
+      }
+      return '';
+    }
+    let html = '';
+    if (g.state === 'in' && g.downDistance) {
+      html += `<div class="situation${g.redZone ? ' red-zone' : ''}">${esc(g.downDistance)}${g.redZone ? '<small>Red zone</small>' : ''}</div>`;
+    }
+    const away = g.away, home = g.home;
+    const n = Math.max(away?.periods?.length || 0, home?.periods?.length || 0);
+    if (n) {
+      const label = (i) => (g.league === 'nhl' ? (i < 3 ? i + 1 : i === 3 ? 'OT' : 'SO') : (i < 4 ? i + 1 : 'OT'));
+      const head = Array.from({ length: n }, (_, i) => `<th>${label(i)}</th>`).join('');
+      const row = (t) => `<tr><td>${esc(t.abbr)}</td>${Array.from({ length: n }, (_, i) => `<td>${t.periods[i] ?? ''}</td>`).join('')}<td>${t.score}</td></tr>`;
+      html += `<table class="lines"><thead><tr><th></th>${head}<th>T</th></tr></thead><tbody>${row(away)}${row(home)}</tbody></table>`;
+    }
+    if (g.state === 'in' && g.lastPlay) html += `<p class="play">${esc(g.lastPlay)}</p>`;
+    return html;
+  }
+
+  function render() {
+    if (!state) return;
+    if (state.buffering) { app.innerHTML = `<div class="empty">Lining up with your TV (${state.delaySeconds}s)…</div>`; return; }
+    const pick = pickGame(state.games || {});
+    if (!pick) {
+      app.innerHTML = `<div class="empty">${wanted ? `No game found for ${esc(wanted)}.` : 'No games scheduled for the teams you follow.'}</div>`;
+      document.body.style.setProperty('--field', '#0d1420');
+      return;
+    }
+    const [follow, g] = pick;
+    const featured = [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
+    document.body.style.setProperty('--field', darken(featured?.color, 0.16));
+    document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
+    app.style.display = 'contents';
+    app.innerHTML =
+      statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + middle(g) +
+      `<div class="spacer"></div><footer class="foot"><span>${online ? `Matched to your TV, ${state.delaySeconds}s behind live` : '<span class="bad">Reconnecting to Game Day…</span>'}</span></footer>`;
+  }
+
+  function connect() {
+    const es = new EventSource('/stream');
+    es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
+    es.onopen = () => { online = true; };
+    es.onerror = () => { online = false; render(); };
+  }
+
+  connect();
+  // Keeps the pregame countdown ticking between data updates.
+  setInterval(() => { if (state && !state.buffering) { const p = pickGame(state.games || {}); if (p && p[1].state === 'pre') render(); } }, 1000);
+</script>
+</body>
+</html>
