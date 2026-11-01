@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { fetchScoreboard, pickFollowed } = require('./lib/espn');
+const { fetchScoreboard, fetchTeamSchedule, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 
 const ROOT = __dirname;
@@ -50,12 +50,33 @@ function leagues() {
   return [...map.values()];
 }
 
+const scheduleCache = new Map(); // abbr -> { t, game }
+
+async function nextFromSchedule(lg, abbr) {
+  const cached = scheduleCache.get(abbr);
+  if (cached && Date.now() - cached.t < 15 * 60 * 1000) return cached.game;
+  try {
+    const game = pickFromSchedule(await fetchTeamSchedule(lg.sport, lg.league, abbr), lg.league);
+    scheduleCache.set(abbr, { t: Date.now(), game });
+    return game;
+  } catch (err) {
+    console.error('schedule error:', err.message);
+    return cached ? cached.game : null;
+  }
+}
+
 async function pollOnce() {
   const games = {};
   for (const lg of leagues()) {
     try {
       const sb = await fetchScoreboard(lg.sport, lg.league);
       Object.assign(games, pickFollowed(sb, lg.league, lg.abbrs));
+      // Teams with no game today: show their next game from the season schedule.
+      for (const abbr of lg.abbrs) {
+        if (games[abbr]) continue;
+        const next = await nextFromSchedule(lg, abbr);
+        if (next) games[abbr] = next;
+      }
       lastFeedError = null;
     } catch (err) {
       lastFeedError = `${new Date().toISOString()} ${err.message}`;
