@@ -89,17 +89,28 @@
   .situation.red-zone { border-left-color: #ff4d4d; }
   .situation small { display: block; font-size: 4.6vmin; font-weight: 500; color: var(--muted); margin-top: 1.2vmin; }
 
-  table.lines { margin: 3vmin 5vmin 4vmin; border-collapse: collapse; font-size: 4.6vmin; width: calc(100% - 10vmin); }
-  .lines th { color: var(--muted); font-weight: 500; padding: 0 0 1.5vmin; text-align: center; }
-  .lines th:first-child, .lines td:first-child { text-align: left; width: 22%; }
-  .lines td { padding: 1.1vmin 0; border-top: 1px solid var(--rule); text-align: center; font-variant-numeric: tabular-nums; }
-  .lines td:last-child, .lines th:last-child { font-weight: 800; color: var(--ink); }
-
+  /* Last play: one line; long ones hold, slide to the end, hold, then start over. */
   .play {
     margin: 2.4vmin 5vmin 0; font-size: 4.4vmin; font-weight: 500; line-height: 1.25;
-    color: var(--muted);
-    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+    color: var(--muted); white-space: nowrap; overflow: hidden;
   }
+  .play span { display: inline-block; will-change: transform; }
+  .play:empty { display: none; }
+
+  /* Other games in your leagues, scrolling along the bottom. */
+  .ticker {
+    margin-top: 3vmin; padding: 2.6vmin 0; overflow: hidden; white-space: nowrap;
+    background: rgba(0,0,0,.28); border-top: 0.5vmin solid var(--accent);
+    font-size: 4.6vmin; font-weight: 600;
+  }
+  .ticker:empty { display: none; }
+  .ticker .track { display: inline-flex; will-change: transform; }
+  .ticker .tk { display: inline-flex; align-items: baseline; gap: 1.6vmin; padding-right: 8vmin; }
+  .ticker .tk b { font-weight: 800; }
+  .ticker .tk .n { font-variant-numeric: tabular-nums; }
+  .ticker .tk .up { opacity: .55; }
+  .ticker .tk em { font-style: normal; font-weight: 500; color: var(--muted); font-size: 3.8vmin; }
+  .ticker .tk em.live { color: #ff8a8a; }
 
   .stats { margin: 3vmin 5vmin 0; display: flex; flex-direction: column; gap: 1.6vmin; }
   .stat { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; row-gap: 0.9vmin; }
@@ -126,10 +137,16 @@
     body { transition: none; }
     .score.scored { animation: none; }
   }
+  #rest { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 </style>
 </head>
 <body>
-<div id="app"><div class="empty">Connecting to Game Day…</div></div>
+<div id="app">
+  <div id="top"><div class="empty">Connecting to Game Day…</div></div>
+  <p id="play" class="play"></p>
+  <div id="rest"></div>
+  <div id="ticker" class="ticker"></div>
+</div>
 
 <script>
   // Which game: ?team=KC, otherwise the live one, else the next one, else the latest final.
@@ -264,39 +281,102 @@
       return '';
     }
     let html = '';
-    if (g.state === 'in' && g.downDistance) {
-      html += `<div class="situation${g.redZone ? ' red-zone' : ''}">${esc(g.downDistance)}${g.redZone ? '<small>Red zone</small>' : ''}</div>`;
-    }
-    if (g.state === 'in' && g.lastPlay) html += `<p class="play">${esc(g.lastPlay)}</p>`;
     html += statBars(g);
     html += '<div class="spacer"></div>';
-    const away = g.away, home = g.home;
-    const n = Math.max(away?.periods?.length || 0, home?.periods?.length || 0);
-    if (n) {
-      const label = (i) => (g.league === 'nhl' ? (i < 3 ? i + 1 : i === 3 ? 'OT' : 'SO') : (i < 4 ? i + 1 : 'OT'));
-      const head = Array.from({ length: n }, (_, i) => `<th>${label(i)}</th>`).join('');
-      const row = (t) => `<tr><td>${esc(t.abbr)}</td>${Array.from({ length: n }, (_, i) => `<td>${t.periods[i] ?? ''}</td>`).join('')}<td>${t.score}</td></tr>`;
-      html += `<table class="lines"><thead><tr><th></th>${head}<th>T</th></tr></thead><tbody>${row(away)}${row(home)}</tbody></table>`;
-    }
     return html;
+  }
+
+  function situation(g) {
+    if (g.state !== 'in' || !g.downDistance) return '';
+    return `<div class="situation${g.redZone ? ' red-zone' : ''}">${esc(g.downDistance)}${g.redZone ? '<small>Red zone</small>' : ''}</div>`;
+  }
+
+  const topEl = document.getElementById('top');
+  const restEl = document.getElementById('rest');
+  const playEl = document.getElementById('play');
+  const tickerEl = document.getElementById('ticker');
+  const vmin = () => Math.min(window.innerWidth, window.innerHeight) / 100;
+  let featuredId = null;
+
+  // Last play: only touched when the text changes, so a slide in progress is never cut short.
+  let playText = null;
+  let playAnim = null;
+  function setPlay(text) {
+    text = text || '';
+    if (text === playText) return;
+    playText = text;
+    if (playAnim) { playAnim.cancel(); playAnim = null; }
+    playEl.innerHTML = text ? `<span>${esc(text)}</span>` : '';
+    if (!text) return;
+    requestAnimationFrame(() => {
+      const span = playEl.firstElementChild;
+      if (!span) return;
+      const dist = span.scrollWidth - playEl.clientWidth;
+      if (dist <= 0) return;
+      const slide = (dist / (9 * vmin())) * 1000; // about 9% of the screen width per second
+      const hold = 2000, rest = 2500, total = hold + slide + rest;
+      playAnim = span.animate([
+        { transform: 'translateX(0)', offset: 0 },
+        { transform: 'translateX(0)', offset: hold / total },
+        { transform: `translateX(${-dist}px)`, offset: (hold + slide) / total },
+        { transform: `translateX(${-dist}px)`, offset: 1 },
+      ], { duration: total, iterations: Infinity, easing: 'linear' });
+    });
+  }
+
+  // Ticker: rebuilt only between laps, so scores update without a jump.
+  function tickerHTML() {
+    const items = ((state && state.ticker) || []).filter((t) => t.id !== featuredId);
+    const rank = { in: 0, pre: 1, post: 2 };
+    items.sort((a, b) => rank[a.state] - rank[b.state] || Date.parse(a.start) - Date.parse(b.start));
+    return items.map((t) => {
+      let when;
+      if (t.state === 'in') when = `<em class="live">${esc(t.detail)}</em>`;
+      else if (t.state === 'post') when = `<em>${esc(t.detail || 'Final')}</em>`;
+      else when = `<em>${new Date(t.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}</em>`;
+      const n = (side) => (t.state === 'pre' ? '' : `<span class="n">${side.score}</span>`);
+      const loser = (me, other) => t.state === 'post' && me.score < other.score ? ' class="up"' : '';
+      return `<span class="tk"><b${loser(t.away, t.home)}>${esc(t.away.abbr)}</b>${n(t.away)}${t.state === 'pre' ? '<em>at</em>' : ''}<b${loser(t.home, t.away)}>${esc(t.home.abbr)}</b>${n(t.home)}${when}</span>`;
+    }).join('');
+  }
+
+  let tickerRunning = false;
+  function runTicker() {
+    const html = tickerHTML();
+    if (!html) { tickerEl.innerHTML = ''; tickerRunning = false; return; }
+    tickerRunning = true;
+    tickerEl.innerHTML = `<div class="track"><div>${html}</div><div aria-hidden="true">${html}</div></div>`;
+    const track = tickerEl.firstElementChild;
+    requestAnimationFrame(() => {
+      const lap = track.firstElementChild.offsetWidth;
+      const ms = (lap / (8 * vmin())) * 1000; // about 8% of the screen width per second
+      const anim = track.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${-lap}px)` }], { duration: ms, easing: 'linear' });
+      anim.onfinish = runTicker;
+    });
   }
 
   function render() {
     if (!state) return;
-    if (state.buffering) { app.innerHTML = `<div class="empty">Lining up with your TV (${state.delaySeconds}s)…</div>`; return; }
+    if (state.buffering) { topEl.innerHTML = `<div class="empty">Lining up with your TV (${state.delaySeconds}s)…</div>`; restEl.innerHTML = ''; setPlay(''); return; }
     const pick = pickGame(state.games || {});
     if (!pick) {
-      app.innerHTML = `<div class="empty">${wanted ? `No game found for ${esc(wanted)}.` : 'No games scheduled for the teams you follow.'}</div>`;
+      topEl.innerHTML = `<div class="empty">${wanted ? `No game found for ${esc(wanted)}.` : 'No games scheduled for the teams you follow.'}</div>`;
+      restEl.innerHTML = '';
+      setPlay('');
       document.body.style.setProperty('--field', '#0d1420');
+      if (!tickerRunning) runTicker();
       return;
     }
     const [follow, g] = pick;
+    featuredId = g.id;
     const featured = [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
-    app.innerHTML =
-      statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + middle(g) +
-      (g.state === 'pre' ? '<div class="spacer"></div>' : '') + (online ? '' : '<footer class="foot"><span class="bad">Reconnecting to Game Day…</span></footer>');
+    topEl.innerHTML = statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + situation(g);
+    setPlay(g.state === 'in' ? g.lastPlay : '');
+    restEl.innerHTML = middle(g) + (g.state === 'pre' ? '<div class="spacer"></div>' : '') +
+      (online ? '' : '<footer class="foot"><span class="bad">Reconnecting to Game Day…</span></footer>');
+    if (!tickerRunning) runTicker();
   }
 
   function connect() {

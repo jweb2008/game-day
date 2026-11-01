@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { fetchScoreboard, fetchTeamSchedule, pickFollowed, pickFromSchedule } = require('./lib/espn');
+const { fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
 
@@ -66,12 +66,26 @@ async function nextFromSchedule(lg, abbr) {
   }
 }
 
+// Every game in the leagues we follow, for the scrolling ticker.
+function tickerItems(sb, league) {
+  return (sb.events || []).map((ev) => {
+    const g = normalizeEvent(ev, league);
+    return {
+      id: g.id, league, state: g.state, detail: g.detail, start: g.start,
+      away: g.away ? { abbr: g.away.abbr, score: g.away.score } : null,
+      home: g.home ? { abbr: g.home.abbr, score: g.home.score } : null,
+    };
+  }).filter((t) => t.away && t.home);
+}
+
 async function pollOnce() {
   const games = {};
+  const ticker = [];
   for (const lg of leagues()) {
     try {
       const sb = await fetchScoreboard(lg.sport, lg.league);
       Object.assign(games, pickFollowed(sb, lg.league, lg.abbrs));
+      ticker.push(...tickerItems(sb, lg.league));
       // Teams with no game today: show their next game from the season schedule.
       for (const abbr of lg.abbrs) {
         if (games[abbr]) continue;
@@ -84,10 +98,11 @@ async function pollOnce() {
       console.error('feed error:', err.message);
       // Keep showing the last good data for this league rather than blanking the screen.
       for (const abbr of lg.abbrs) if (live.games[abbr]) games[abbr] = live.games[abbr];
+      ticker.push(...(live.ticker || []).filter((t) => t.league === lg.league));
     }
   }
   await addStats(games);
-  live = { at: new Date().toISOString(), games };
+  live = { at: new Date().toISOString(), games, ticker };
   buffer.push(live);
 }
 
@@ -154,6 +169,7 @@ function screenState() {
     buffering: shown === null,
     at: shown ? shown.at : null,
     games: shown ? shown.games : {},
+    ticker: shown ? shown.ticker || [] : [],
   };
 }
 
