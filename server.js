@@ -119,6 +119,7 @@ function broadcast(type, data) {
 function screenState() {
   return {
     delaySeconds: config.delaySeconds,
+    timeZone: config.timeZone || null,
     buffering: shown === null,
     at: shown ? shown.at : null,
     games: shown ? shown.games : {},
