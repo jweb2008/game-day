@@ -152,6 +152,24 @@ async function pollLoop() {
 
 let shown = null; // the delayed snapshot the screens are showing
 const recentEvents = [];
+const recentTD = new Map(); // "gameId:abbr" -> time of their last touchdown, to tell a 2-point try from a safety
+
+// What kind of score it was, so the screens know which takeover to run.
+function scoreKind(ev, game) {
+  if (game.league === 'nhl') return 'goal';
+  const key = `${game.id}:${ev.team}`;
+  if (ev.points >= 6) { recentTD.set(key, Date.now()); return 'touchdown'; }
+  if (ev.points === 3) return 'fieldgoal';
+  if (ev.points === 2) return Date.now() - (recentTD.get(key) || 0) < 5 * 60 * 1000 ? 'twopoint' : 'safety';
+  return 'extrapoint';
+}
+
+function publish(event) {
+  recentEvents.unshift(event);
+  recentEvents.length = Math.min(recentEvents.length, 50);
+  console.log('event:', JSON.stringify(event));
+  broadcast('game', event);
+}
 const clients = new Set();
 
 function send(res, type, data) {
@@ -173,27 +191,131 @@ function screenState() {
   };
 }
 
+// The newest snapshot events were worked out from. It only moves forward, so making the
+// delay longer (the screens step back in time) never replays a score a second time.
+let eventBase = null;
+
 function tick() {
   const next = buffer.at(config.delaySeconds * 1000);
   if (!next || next === shown) return;
-  if (shown) {
+  const forward = !eventBase || Date.parse(next.at) > Date.parse(eventBase.at);
+  if (eventBase && forward) {
     for (const [abbr, game] of Object.entries(next.games)) {
-      for (const ev of diffGame(shown.games[abbr], game)) {
+      for (const ev of diffGame(eventBase.games[abbr], game)) {
         const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
-        recentEvents.unshift(event);
-        recentEvents.length = Math.min(recentEvents.length, 50);
-        console.log('event:', JSON.stringify(event));
-        broadcast('game', event);
+        if (ev.type === 'score') event.kind = scoreKind(ev, game);
+        publish(event);
       }
     }
   }
+  if (forward) eventBase = next;
   shown = next;
   broadcast('state', screenState());
 }
 
+// ---- sounds and videos -------------------------------------------------
+// Files are named for the moment they play on, optionally for one team:
+// touchdown.mp4, KC-touchdown.mp3, BOS-win.mp3 (Dirty Water), anthem.mp3 ...
+// They live outside the code folder, so updates never touch them.
+
+const MEDIA_DIR = path.resolve(ROOT, config.mediaDir || 'media');
+const MOMENTS = ['touchdown', 'fieldgoal', 'safety', 'twopoint', 'goal', 'win', 'defense', 'anthem'];
+const AUDIO = ['mp3', 'm4a', 'wav', 'ogg'];
+const VIDEO = ['mp4', 'webm'];
+const MAX_UPLOAD = 150 * 1024 * 1024;
+
+function mediaName(name) {
+  const m = /^(?:([A-Z]{2,4})-)?([a-z]+)\.([a-z0-9]+)$/.exec(name || '');
+  if (!m || !MOMENTS.includes(m[2]) || ![...AUDIO, ...VIDEO].includes(m[3])) return null;
+  return { team: m[1] || null, moment: m[2], ext: m[3], video: VIDEO.includes(m[3]) };
+}
+
+function listMedia() {
+  if (!fs.existsSync(MEDIA_DIR)) return [];
+  return fs.readdirSync(MEDIA_DIR)
+    .filter((f) => mediaName(f))
+    .map((f) => ({ name: f, size: fs.statSync(path.join(MEDIA_DIR, f)).size, ...mediaName(f) }));
+}
+
+function saveMedia(req, res, name) {
+  const info = mediaName(name);
+  if (!info) return json(res, 400, { error: `Name must look like touchdown.mp3 or KC-touchdown.mp4 (moments: ${MOMENTS.join(', ')})` });
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  const tmp = path.join(MEDIA_DIR, `.upload-${Date.now()}`);
+  const out = fs.createWriteStream(tmp);
+  let bytes = 0;
+  let failed = false;
+  req.on('data', (chunk) => {
+    bytes += chunk.length;
+    if (bytes > MAX_UPLOAD && !failed) {
+      failed = true;
+      out.destroy();
+      fs.rm(tmp, { force: true }, () => {});
+      json(res, 413, { error: 'File is over 150 MB' });
+      req.destroy();
+    }
+  });
+  req.pipe(out);
+  out.on('finish', () => {
+    if (failed) return;
+    // One sound and one video per moment: replace the old one of the same kind.
+    for (const f of listMedia()) {
+      if (f.team === info.team && f.moment === info.moment && f.video === info.video) fs.rmSync(path.join(MEDIA_DIR, f.name), { force: true });
+    }
+    fs.renameSync(tmp, path.join(MEDIA_DIR, name));
+    broadcast('media', listMedia());
+    json(res, 200, { saved: name, bytes });
+  });
+  out.on('error', (err) => { if (!failed) json(res, 500, { error: err.message }); });
+}
+
+// Streams a file, with byte ranges so TV browsers can play video smoothly.
+function serveMedia(req, res, name) {
+  if (!mediaName(name)) return json(res, 404, { error: 'not found' });
+  const file = path.join(MEDIA_DIR, name);
+  fs.stat(file, (err, st) => {
+    if (err) return json(res, 404, { error: 'not found' });
+    const type = TYPES['.' + mediaName(name).ext] || 'application/octet-stream';
+    const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+    if (range) {
+      const start = range[1] ? Number(range[1]) : 0;
+      const end = range[2] ? Math.min(Number(range[2]), st.size - 1) : st.size - 1;
+      if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); return res.end(); }
+      res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1 });
+      return fs.createReadStream(file, { start, end }).pipe(res);
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': st.size });
+    fs.createReadStream(file).pipe(res);
+  });
+}
+
+// ---- takeovers on demand ----------------------------------------------
+// For testing from the status page, and for Home Assistant (anthem on and off).
+
+const POINTS = { touchdown: 6, fieldgoal: 3, safety: 2, twopoint: 2, goal: 1 };
+
+function takeover(type, team) {
+  const at = new Date().toISOString();
+  const follow = (team || config.teams[0].abbr).toUpperCase();
+  const game = shown && shown.games[follow];
+  const base = { follow, game: game ? game.id : null, league: game ? game.league : null, at, test: true };
+  if (POINTS[type]) return { ...base, type: 'score', kind: type, team: follow, points: POINTS[type] };
+  if (type === 'win') return { ...base, type: 'final', winner: follow };
+  if (type === 'third' || type === 'defense') {
+    const other = game && [game.home, game.away].find((t) => t && t.abbr !== follow);
+    return { ...base, type: 'third', offense: type === 'third' ? follow : (other ? other.abbr : 'OPP'), text: '3rd & 4' };
+  }
+  if (type === 'anthem') return { type: 'anthem', at };
+  if (type === 'clear') return { type: 'clear', at };
+  return null;
+}
+
 // ---- web --------------------------------------------------------------
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.json': 'application/json' };
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json',
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp4': 'video/mp4', '.webm': 'video/webm',
+};
 
 function json(res, code, body) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -220,6 +342,7 @@ const server = http.createServer((req, res) => {
     res.write('retry: 3000\n\n');
     clients.add(res);
     send(res, 'state', screenState());
+    send(res, 'media', listMedia());
     req.on('close', () => clients.delete(res));
     return;
   }
@@ -247,6 +370,28 @@ const server = http.createServer((req, res) => {
     broadcast('state', screenState());
     return json(res, 200, { delaySeconds: seconds });
   }
+
+  if (url.pathname === '/api/takeover' && req.method === 'POST') {
+    const type = String(url.searchParams.get('type') || '').toLowerCase();
+    const off = /^(0|off|false)$/i.test(url.searchParams.get('on') || '');
+    const event = takeover(type === 'anthem' && off ? 'clear' : type, url.searchParams.get('team'));
+    if (!event) return json(res, 400, { error: 'type must be one of touchdown, fieldgoal, safety, twopoint, goal, win, third, defense, anthem, clear' });
+    publish(event);
+    return json(res, 200, event);
+  }
+
+  if (url.pathname === '/api/media') return json(res, 200, { moments: MOMENTS, files: listMedia() });
+  if (url.pathname.startsWith('/api/media/')) {
+    const name = decodeURIComponent(url.pathname.slice('/api/media/'.length));
+    if (req.method === 'PUT') return saveMedia(req, res, name);
+    if (req.method === 'DELETE') {
+      if (!mediaName(name)) return json(res, 404, { error: 'not found' });
+      fs.rmSync(path.join(MEDIA_DIR, name), { force: true });
+      broadcast('media', listMedia());
+      return json(res, 200, { deleted: name });
+    }
+  }
+  if (url.pathname.startsWith('/media/') && req.method === 'GET') return serveMedia(req, res, decodeURIComponent(url.pathname.slice(7)));
 
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' });
   return serveStatic(req, res, url.pathname);

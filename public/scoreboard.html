@@ -138,6 +138,87 @@
     .score.scored { animation: none; }
   }
   #rest { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+  /* ---- Takeovers: the whole screen for a score, a win or the anthem ---- */
+  .tko {
+    position: absolute; inset: 0; z-index: 10; overflow: hidden;
+    background: var(--t1); color: var(--t-ink);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  }
+  .tko[hidden], .banner[hidden] { display: none; }
+  .tko.out { animation: tko-out .6s ease-in forwards; }
+  @keyframes tko-out { to { opacity: 0; } }
+  .tko .stripes {
+    position: absolute; inset: -60%;
+    background: repeating-linear-gradient(-30deg, var(--t1) 0 9vmin, var(--t2) 9vmin 18vmin);
+    opacity: .32; animation: stripes 1.1s linear infinite;
+  }
+  @keyframes stripes { to { transform: translateY(20.785vmin); } }
+  .tko .flash { position: absolute; inset: 0; background: #fff; animation: flash .8s ease-out both; pointer-events: none; }
+  @keyframes flash { from { opacity: .95; } to { opacity: 0; } }
+  .tko .content { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; }
+  .tko .word {
+    font-weight: 800; line-height: .8; text-transform: uppercase; letter-spacing: -.01em;
+    text-shadow: 0 1.4vmin 0 rgba(0,0,0,.22);
+  }
+  .tko .word span { display: block; width: max-content; margin: 0 auto; animation: slam .55s cubic-bezier(.2,1.5,.4,1) both; }
+  .tko .word span + span { animation-delay: .18s; }
+  @keyframes slam { from { transform: scale(2.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .tko .logo { width: 44vmin; height: 44vmin; object-fit: contain; margin: 0 0 7vmin; animation: pop .7s .3s cubic-bezier(.2,1.4,.4,1) both; filter: drop-shadow(0 1.5vmin 2vmin rgba(0,0,0,.35)); }
+  @keyframes pop { from { transform: scale(.2) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .tko video { width: 100%; max-height: 62vmax; margin: 6vmin 0; background: #000; object-fit: contain; animation: rise .5s .2s both; }
+  .tko .line { margin-top: 8vmin; font-size: 10vmin; font-weight: 800; display: flex; gap: 6vmin; font-variant-numeric: tabular-nums; animation: rise .5s .6s both; }
+  .tko .line .dim { opacity: .55; }
+  .tko .small { font-size: 6vmin; font-weight: 600; opacity: .85; margin-top: 3vmin; letter-spacing: .08em; text-transform: uppercase; animation: rise .5s .8s both; }
+  @keyframes rise { from { transform: translateY(6vmin); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Goal: the red goal light spinning over the team color. */
+  .tko .beacon {
+    position: absolute; left: 50%; top: 50%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax;
+    background: conic-gradient(rgba(230,0,0,0) 0deg, rgba(235,10,10,1) 35deg, rgba(230,0,0,0) 75deg,
+                               rgba(230,0,0,0) 180deg, rgba(235,10,10,1) 215deg, rgba(230,0,0,0) 255deg);
+    animation: spin 1.1s linear infinite; opacity: .6;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Win: confetti in team colors. */
+  .tko .confetti i {
+    position: absolute; top: -6vmax; width: 2.4vmin; height: 4.2vmin; background: var(--c);
+    left: var(--x); animation: fall var(--d) var(--w) linear infinite; opacity: .95;
+  }
+  @keyframes fall { to { transform: translateY(115vmax) rotate(var(--r)); } }
+
+  /* Anthem: a waving flag on a dark screen. */
+  .tko.anthem { background: #04060b; color: #e9ecf2; animation: fade-in 2s ease both; }
+  @keyframes fade-in { from { opacity: 0; } }
+  .flag { display: flex; width: 88vmin; height: calc(88vmin * 10 / 19); filter: drop-shadow(0 2vmin 3vmin rgba(0,0,0,.6)); }
+  .flag i { flex: 1; background-size: 88vmin 100%; animation: wave 2.6s ease-in-out infinite alternate; }
+  @keyframes wave {
+    from { transform: translateY(-1.4vmin); filter: brightness(1.08); }
+    to   { transform: translateY(1.4vmin);  filter: brightness(.82); }
+  }
+  .tko.anthem .small { margin-top: 9vmin; font-size: 6.4vmin; opacity: .7; }
+
+  /* Banners: 3rd down and 2-point tries, over the scoreboard, not instead of it. */
+  .banner {
+    position: absolute; left: 0; right: 0; top: 40%; z-index: 9; overflow: hidden;
+    padding: 5vmin 5vmin 4.5vmin; text-align: center;
+    background: var(--t1); color: var(--t-ink);
+    box-shadow: 0 2vmin 6vmin rgba(0,0,0,.5);
+    animation: band-in .45s cubic-bezier(.2,1.3,.4,1) both;
+  }
+  .banner.out { animation: band-out .4s ease-in forwards; }
+  @keyframes band-in { from { transform: scaleY(0); } }
+  @keyframes band-out { to { transform: scaleY(0); opacity: 0; } }
+  .banner .stripes { position: absolute; inset: -60%; background: repeating-linear-gradient(-30deg, var(--t1) 0 7vmin, var(--t2) 7vmin 14vmin); opacity: .25; animation: stripes 1.1s linear infinite; }
+  .banner b { position: relative; display: block; font-size: 19vmin; font-weight: 800; line-height: .85; }
+  .banner.defense b { animation: pulse .5s ease-in-out infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.07); } }
+  .banner span { position: relative; display: block; font-size: 6.4vmin; font-weight: 600; margin-top: 2vmin; opacity: .9; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tko *, .banner, .banner * { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
+  }
 </style>
 </head>
 <body>
@@ -146,6 +227,8 @@
   <p id="play" class="play"></p>
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
+  <div id="banner" class="banner" hidden></div>
+  <div id="takeover" class="tko" hidden></div>
 </div>
 
 <script>
@@ -379,9 +462,234 @@
     if (!tickerRunning) runTicker();
   }
 
+
+  // ---- Takeovers ---------------------------------------------------------
+  // Score and win takeovers arrive on the same delay as the scoreboard, so they land with your TV.
+  // ?sound=0 keeps a screen quiet (only one screen in the room should play sound).
+  const soundOn = params.get('sound') !== '0';
+  const tkoEl = document.getElementById('takeover');
+  const bannerEl = document.getElementById('banner');
+  let media = [];
+  let current = null;   // the takeover on screen
+  const queue = [];
+  let bannerTimer = null;
+
+  // How long each one stays up: at least `min`, longer if its sound or video runs on, never past `max`.
+  const LENGTH = {
+    touchdown: [10000, 45000], fieldgoal: [6000, 20000], safety: [7000, 20000], goal: [10000, 45000],
+    win: [30000, 240000], anthem: [300000, 300000],
+  };
+  const WORDS = {
+    touchdown: ['Touch', 'down'], fieldgoal: ['Field', 'goal'], safety: ['Safety'], goal: ['Goal'], win: ['Win'],
+  };
+
+  // A team's own file wins over the general one: KC-touchdown.mp4 before touchdown.mp4.
+  function findMedia(moment, team) {
+    const pick = (video) => media.find((f) => f.moment === moment && f.team === team && f.video === video)
+      || media.find((f) => f.moment === moment && !f.team && f.video === video);
+    return { video: pick(true), audio: pick(false) };
+  }
+
+  function teamsFor(follow) {
+    const g = state && state.games && state.games[follow];
+    const us = g && [g.home, g.away].find((t) => t && t.abbr === follow);
+    const them = g && [g.home, g.away].find((t) => t && t.abbr !== follow);
+    return { g, us, them };
+  }
+
+  function paint(el, t) {
+    const c1 = bandColor(t || { color: '#2a3342' });
+    const c2 = (t && (t.altColor && t.altColor !== c1 ? t.altColor : null)) || darken(c1, 0.6);
+    el.style.setProperty('--t1', c1);
+    el.style.setProperty('--t2', c2);
+    el.style.setProperty('--t-ink', inkFor(c1));
+    return [c1, c2];
+  }
+
+  function scoreLine(g) {
+    if (!g || !g.away || !g.home) return '';
+    const dim = (a, b) => (a.score < b.score ? ' class="dim"' : '');
+    return `<div class="line"><span${dim(g.away, g.home)}>${esc(g.away.abbr)} ${g.away.score}</span><span${dim(g.home, g.away)}>${esc(g.home.abbr)} ${g.home.score}</span></div>`;
+  }
+
+  function flagHTML() {
+    // 50 stars, 13 stripes, drawn here so there is no image to fetch.
+    const W = 19, H = 10, cw = 7.6, ch = H * 7 / 13;
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" fill="#fff"/>`;
+    for (let i = 0; i < 13; i += 2) svg += `<rect y="${(i * H) / 13}" width="${W}" height="${H / 13}" fill="#B22234"/>`;
+    svg += `<rect width="${cw}" height="${ch}" fill="#3C3B6E"/>`;
+    const r = 0.308, star = (x, y) => {
+      const pts = [];
+      for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k * Math.PI) / 5, rr = k % 2 ? r * 0.382 : r; pts.push(`${(x + rr * Math.cos(a)).toFixed(3)},${(y + rr * Math.sin(a)).toFixed(3)}`); }
+      return `<polygon points="${pts.join(' ')}" fill="#fff"/>`;
+    };
+    for (let row = 0; row < 9; row++) {
+      const y = ((row + 1) * ch) / 10;
+      for (let k = 0; k < (row % 2 ? 5 : 6); k++) svg += star(((row % 2 ? 2 * k + 2 : 2 * k + 1) * cw) / 12, y);
+    }
+    svg += '</svg>';
+    const url = `url('data:image/svg+xml,${encodeURIComponent(svg).replace(/'/g, '%27')}')`;
+    const strips = 32;
+    let html = '<div class="flag">';
+    for (let i = 0; i < strips; i++) {
+      html += `<i style="background-image:${url};background-position:${(-i * 88) / strips}vmin 0;animation-delay:${(-i * 0.09).toFixed(2)}s"></i>`;
+    }
+    return html + '</div>';
+  }
+
+  function confettiHTML(colors) {
+    let html = '<div class="confetti">';
+    for (let i = 0; i < 70; i++) {
+      const c = [colors[0], colors[1], '#ffffff'][i % 3];
+      html += `<i style="--c:${c};--x:${(Math.random() * 100).toFixed(1)}%;--d:${(2.6 + Math.random() * 2.4).toFixed(2)}s;--w:${(-Math.random() * 5).toFixed(2)}s;--r:${Math.round(360 + Math.random() * 720)}deg"></i>`;
+    }
+    return html + '</div>';
+  }
+
+  // Big words fill the width without running off the edge, whatever the team name or screen.
+  function fitWord(el) {
+    if (!el) return;
+    const room = tkoEl.clientWidth * 0.92;
+    const widest = Math.max(...[...el.children].map((s) => s.scrollWidth));
+    if (widest > room) el.style.fontSize = `${(parseFloat(el.style.fontSize) * room) / widest}vmin`;
+  }
+
+  function playMedia(found, onEnded) {
+    const els = [];
+    const done = () => { if (onEnded) { const f = onEnded; onEnded = null; f(); } };
+    const video = tkoEl.querySelector('video');
+    if (video) {
+      video.muted = !soundOn || !!found.audio; // a separate sound file plays over a video's own sound
+      video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+      video.addEventListener('ended', done);
+      els.push(video);
+    }
+    if (found.audio && soundOn) {
+      const a = new Audio(`/media/${encodeURIComponent(found.audio.name)}`);
+      a.play().catch(() => done());
+      a.addEventListener('ended', done);
+      a.addEventListener('error', done);
+      els.push(a);
+    }
+    if (!els.length) done();
+    return els;
+  }
+
+  function fadeOut(els) {
+    for (const el of els) {
+      const start = el.volume;
+      let n = 0;
+      const t = setInterval(() => { n++; el.volume = Math.max(0, start * (1 - n / 10)); if (n >= 10) { clearInterval(t); el.pause(); } }, 60);
+    }
+  }
+
+  function showTakeover(item) {
+    const { moment, follow } = item;
+    const { g, us } = teamsFor(follow);
+    const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, follow);
+    tkoEl.className = 'tko' + (moment === 'anthem' ? ' anthem' : '') + (found.video ? ' has-video' : '');
+    const colors = paint(tkoEl, us);
+    let html;
+    if (moment === 'anthem') {
+      html = `<div class="content">${flagHTML()}<div class="small">National Anthem</div></div>`;
+    } else {
+      const word = (WORDS[moment] || [moment]).map((w) => `<span>${esc(w)}</span>`).join('');
+      const size = moment === 'win' ? 56 : moment === 'goal' ? 44 : 34; // shrunk to fit below if needed
+      const visual = found.video
+        ? `<video src="/media/${encodeURIComponent(found.video.name)}" playsinline preload="auto"></video>`
+        : (us && us.logo ? `<img class="logo" src="${esc(us.logo)}" alt="" onerror="this.remove()">` : '');
+      const small = moment === 'win' ? `<div class="small">${esc((us && us.name) || follow)} win · Final</div>` : '';
+      html = (moment === 'goal' ? '<div class="beacon"></div>' : '<div class="stripes"></div>') +
+        (moment === 'win' ? confettiHTML(colors) : '') +
+        `<div class="content">${found.video ? '' : visual}<div class="word" style="font-size:${size}vmin">${word}</div>${found.video ? visual : ''}${scoreLine(g)}${small}</div>` +
+        '<div class="flash"></div>';
+    }
+    tkoEl.innerHTML = html;
+    tkoEl.hidden = false;
+    fitWord(tkoEl.querySelector('.word'));
+
+    const [min, max] = LENGTH[moment] || [8000, 20000];
+    const started = Date.now();
+    let mediaDone = false;
+    const finish = () => endTakeover(item);
+    item.timers = [setTimeout(() => { if (mediaDone || !(found.audio || found.video)) finish(); }, min), setTimeout(finish, max)];
+    item.els = playMedia(found, () => {
+      mediaDone = true;
+      if (Date.now() - started >= min) finish();
+    });
+    current = item;
+  }
+
+  function endTakeover(item, now) {
+    if (current !== item) return;
+    item.timers.forEach(clearTimeout);
+    fadeOut(item.els || []);
+    current = null;
+    const next = () => {
+      tkoEl.hidden = true; tkoEl.innerHTML = '';
+      if (queue.length) showTakeover(queue.shift());
+    };
+    if (now) return next();
+    tkoEl.classList.add('out');
+    setTimeout(next, 600);
+  }
+
+  function startTakeover(item) {
+    if (item.moment === 'anthem') { queue.length = 0; if (current) endTakeover(current, true); return showTakeover(item); }
+    if (current) { if (queue.length < 4) queue.push(item); return; }
+    showTakeover(item);
+  }
+
+  function showBanner(cls, big, sub, follow, moment) {
+    if (current) return; // a takeover is up; the banner would only hide behind it
+    clearTimeout(bannerTimer);
+    const { us } = teamsFor(follow);
+    paint(bannerEl, us);
+    bannerEl.className = `banner ${cls}`;
+    bannerEl.innerHTML = `<div class="stripes"></div><b>${esc(big)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+    bannerEl.hidden = false;
+    let els = [];
+    if (moment) { const found = findMedia(moment, follow); if (found.audio) els = playMedia({ audio: found.audio }); }
+    bannerTimer = setTimeout(() => {
+      fadeOut(els);
+      bannerEl.classList.add('out');
+      bannerTimer = setTimeout(() => { bannerEl.hidden = true; }, 400);
+    }, 5000);
+  }
+
+  function featuredFollow() {
+    const pick = state && pickGame(state.games || {});
+    return pick ? pick[0] : null;
+  }
+
+  function onGameEvent(ev) {
+    if (ev.type === 'anthem') return startTakeover({ moment: 'anthem', follow: featuredFollow() });
+    if (ev.type === 'clear') {
+      queue.length = 0;
+      if (current) endTakeover(current);
+      return;
+    }
+    if (!state || state.buffering) return;
+    // Scores and 3rd downs: only for the game this screen is showing (tests always show).
+    const mine = ev.test || ev.follow === featuredFollow();
+    if (ev.type === 'score' && ev.team === ev.follow && mine) {
+      if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow);
+      if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow });
+    }
+    if (ev.type === 'third' && mine) {
+      if (ev.offense === ev.follow) return showBanner('third', '3rd down', ev.text, ev.follow);
+      return showBanner('defense', 'Defense', ev.text, ev.follow, 'defense');
+    }
+    // A win: for any team you follow.
+    if (ev.type === 'final' && ev.winner && ev.winner === ev.follow) startTakeover({ moment: 'win', follow: ev.follow });
+  }
+
   function connect() {
     const es = new EventSource('/stream');
     es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
+    es.addEventListener('media', (e) => { media = JSON.parse(e.data); });
+    // The new score reaches the screen right after its event; wait a beat so the takeover shows it.
+    es.addEventListener('game', (e) => { const ev = JSON.parse(e.data); setTimeout(() => onGameEvent(ev), 150); });
     es.onopen = () => { online = true; };
     es.onerror = () => { online = false; render(); };
   }

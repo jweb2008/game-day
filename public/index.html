@@ -24,6 +24,12 @@
   td { padding: 6px 4px; border-top: 1px solid var(--line); }
   .ok { color: var(--good); } .err { color: var(--bad); }
   .empty { color: var(--muted); }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  select, button, input[type=file] { font: inherit; color: var(--text); background: #1d2533; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  button { cursor: pointer; } button:hover { border-color: #46546f; }
+  button.danger { color: #ff9ea1; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -33,6 +39,27 @@
   <div class="row" style="margin-top:16px">
     <div class="card"><strong>Feed</strong><div id="feed" class="meta">…</div></div>
     <div class="card"><strong>Recent events</strong> <span class="meta">(what the lights and takeovers will react to)</span><table id="events"></table></div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <div class="card">
+      <h2>Test a takeover</h2>
+      <div class="controls">
+        <label>Team <select id="tteam"></select></label>
+      </div>
+      <div class="controls" id="tbuttons"></div>
+      <div class="note">Shows on every scoreboard screen right away (no delay). Anthem stays up until you press Clear.</div>
+    </div>
+    <div class="card">
+      <h2>Sounds and videos</h2>
+      <div class="controls">
+        <select id="mteam"><option value="">Any team</option></select>
+        <select id="mmoment"></select>
+        <input type="file" id="mfile" accept=".mp3,.m4a,.wav,.ogg,.mp4,.webm">
+        <button id="mupload">Upload</button>
+      </div>
+      <div id="mstatus" class="note">A team's own file plays instead of the "Any team" one. One sound and one video per moment.</div>
+      <table id="mlist"></table>
+    </div>
   </div>
 
 <script>
@@ -82,11 +109,58 @@
         `Following: ${s.teams.map((t) => esc(t.name)).join(', ')}<br>` +
         (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>');
       $('events').innerHTML = s.events.length
-        ? s.events.map((e) => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.follow)}</td><td>${esc(e.type)}${e.type === 'score' ? ` ${esc(e.team)} +${e.points}` : ''}${e.type === 'final' ? ` (winner ${esc(e.winner || '?')})` : ''}</td></tr>`).join('')
+        ? s.events.map((e) => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.follow)}</td><td>${esc(e.type === 'score' && e.kind ? e.kind : e.type)}${e.type === 'score' ? ` ${esc(e.team)} +${e.points}` : ''}${e.type === 'third' ? ` (${esc(e.offense || '?')} ball)` : ''}${e.test ? ' <span class=\"meta\">test</span>' : ''}${e.type === 'final' ? ` (winner ${esc(e.winner || '?')})` : ''}</td></tr>`).join('')
         : '<tr><td class="empty">None yet. Scores, starts and finals show here.</td></tr>';
     } catch { $('feed').innerHTML = '<span class="err">Server not answering</span>'; }
   }
 
+  // ---- takeover tests and the sound/video store ----
+  const TESTS = [['touchdown', 'Touchdown'], ['fieldgoal', 'Field goal'], ['safety', 'Safety'], ['twopoint', '2-point'],
+    ['third', '3rd down'], ['defense', '3rd down (defense)'], ['goal', 'Goal'], ['win', 'Win'], ['anthem', 'Anthem'], ['clear', 'Clear']];
+  const MOMENT_NAMES = { touchdown: 'Touchdown', fieldgoal: 'Field goal', safety: 'Safety', twopoint: '2-point', goal: 'Goal', win: 'Win', defense: '3rd down defense', anthem: 'Anthem' };
+
+  async function setupTests() {
+    const s = await (await fetch('/api/status')).json();
+    const opts = s.teams.map((t) => `<option value="${esc(t.abbr)}">${esc(t.name)}</option>`).join('');
+    $('tteam').innerHTML = opts;
+    $('mteam').innerHTML += opts;
+    $('tbuttons').innerHTML = TESTS.map(([k, label]) => `<button data-k="${k}" class="${k === 'clear' ? 'danger' : ''}">${label}</button>`).join('');
+    $('tbuttons').onclick = (e) => {
+      const k = e.target.dataset.k;
+      if (k) fetch(`/api/takeover?type=${k}&team=${encodeURIComponent($('tteam').value)}`, { method: 'POST' });
+    };
+    $('mmoment').innerHTML = Object.entries(MOMENT_NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  }
+
+  async function refreshMedia() {
+    const { files } = await (await fetch('/api/media')).json();
+    $('mlist').innerHTML = files.length
+      ? files.map((f) => `<tr><td>${esc(f.team || 'Any team')}</td><td>${esc(MOMENT_NAMES[f.moment] || f.moment)}</td><td>${f.video ? 'video' : 'sound'}</td>` +
+        `<td class="meta">${(f.size / 1048576).toFixed(1)} MB</td><td><a href="/media/${encodeURIComponent(f.name)}" target="_blank" style="color:#9fb5d9">play</a></td>` +
+        `<td><button class="danger" data-del="${esc(f.name)}">Remove</button></td></tr>`).join('')
+      : '<tr><td class="empty">Nothing uploaded yet. Takeovers still run, just silent.</td></tr>';
+  }
+  $('mlist').onclick = async (e) => {
+    const name = e.target.dataset.del;
+    if (!name) return;
+    await fetch(`/api/media/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    refreshMedia();
+  };
+  $('mupload').onclick = async () => {
+    const file = $('mfile').files[0];
+    if (!file) { $('mstatus').textContent = 'Pick a file first.'; return; }
+    const ext = file.name.split('.').pop().toLowerCase();
+    const name = `${$('mteam').value ? $('mteam').value + '-' : ''}${$('mmoment').value}.${ext}`;
+    $('mstatus').textContent = `Uploading ${file.name}…`;
+    const r = await fetch(`/api/media/${encodeURIComponent(name)}`, { method: 'PUT', body: file });
+    const j = await r.json().catch(() => ({}));
+    $('mstatus').textContent = r.ok ? `Saved as ${j.saved}.` : `Upload failed: ${j.error || r.status}`;
+    $('mfile').value = '';
+    refreshMedia();
+  };
+
+  setupTests();
+  refreshMedia();
   connect();
   refreshStatus();
   setInterval(refreshStatus, 5000);

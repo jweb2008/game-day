@@ -25,6 +25,20 @@ bash /opt/game-day/update.sh
 | `/scoreboard.html` | Portrait scoreboard for a TV; `?team=KC` picks a game, otherwise live, then next, then latest final |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
-| `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`) |
+| `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`); Home Assistant's delay slider calls this |
+| `POST /api/takeover?type=touchdown&team=KC` | Show a takeover now. Types: touchdown, fieldgoal, safety, twopoint, goal, win, third, defense, anthem, clear |
+| `GET /api/media`, `PUT`/`DELETE /api/media/KC-touchdown.mp4` | Sounds and videos for takeovers (the status page has an upload form) |
+
+## Takeovers
+
+When a team you follow scores or wins, the scoreboard screens switch to a full-screen takeover on the
+same delay as the scoreboard: TOUCHDOWN, FIELD GOAL, SAFETY, GOAL (with a spinning goal light) and WIN
+(confetti, final score). A 2-point conversion and each new 3rd down get a banner over the scoreboard
+instead (DEFENSE when the other team has the ball). Scores and 3rd downs show only for the game a screen
+is showing; wins show for every team you follow.
+
+Sounds and videos are optional and live in `media/` (outside git). Name them for the moment, and
+optionally the team: `touchdown.mp4`, `KC-touchdown.mp3`, `BOS-win.mp3`, `defense.mp3`, `anthem.mp3`.
+A team's own file wins over the general one. Add `?sound=0` to any screen that should stay quiet.
 
 Per-house overrides go in `config.local.json` next to `config.json` (not tracked in git).
