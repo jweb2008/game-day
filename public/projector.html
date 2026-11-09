@@ -1,0 +1,8 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Projector</title>
+<script>
+  // Short address for the projector: /projector.html is the scoreboard's logo page.
+  const extra = location.search.replace(/^\?/, '');
+  location.replace('scoreboard.html?view=logo' + (extra ? '&' + extra : ''));
+</script>
