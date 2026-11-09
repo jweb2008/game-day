@@ -54,10 +54,10 @@
       <div class="controls">
         <select id="mteam"><option value="">Any team</option></select>
         <select id="mmoment"></select>
-        <input type="file" id="mfile" accept=".mp3,.m4a,.wav,.ogg,.mp4,.webm">
+        <input type="file" id="mfile" accept=".mp3,.m4a,.wav,.ogg,.mp4,.webm,.png,.jpg,.jpeg,.gif,.webp">
         <button id="mupload">Upload</button>
       </div>
-      <div id="mstatus" class="note">A team's own file plays instead of the "Any team" one. One sound and one video per moment.</div>
+      <div id="mstatus" class="note">A team's own file plays instead of the "Any team" one. One sound, one video and one picture per moment. For Anthem, a video or picture replaces the built-in flag.</div>
       <table id="mlist"></table>
     </div>
   </div>
@@ -135,7 +135,7 @@
   async function refreshMedia() {
     const { files } = await (await fetch('/api/media')).json();
     $('mlist').innerHTML = files.length
-      ? files.map((f) => `<tr><td>${esc(f.team || 'Any team')}</td><td>${esc(MOMENT_NAMES[f.moment] || f.moment)}</td><td>${f.video ? 'video' : 'sound'}</td>` +
+      ? files.map((f) => `<tr><td>${esc(f.team || 'Any team')}</td><td>${esc(MOMENT_NAMES[f.moment] || f.moment)}</td><td>${f.type === 'image' ? 'picture' : f.video ? 'video' : 'sound'}</td>` +
         `<td class="meta">${(f.size / 1048576).toFixed(1)} MB</td><td><a href="/media/${encodeURIComponent(f.name)}" target="_blank" style="color:#9fb5d9">play</a></td>` +
         `<td><button class="danger" data-del="${esc(f.name)}">Remove</button></td></tr>`).join('')
       : '<tr><td class="empty">Nothing uploaded yet. Takeovers still run, just silent.</td></tr>';

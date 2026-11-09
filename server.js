@@ -222,12 +222,14 @@ const MEDIA_DIR = path.resolve(ROOT, config.mediaDir || 'media');
 const MOMENTS = ['touchdown', 'fieldgoal', 'safety', 'twopoint', 'goal', 'win', 'defense', 'anthem'];
 const AUDIO = ['mp3', 'm4a', 'wav', 'ogg'];
 const VIDEO = ['mp4', 'webm'];
+const IMAGE = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 const MAX_UPLOAD = 150 * 1024 * 1024;
 
 function mediaName(name) {
   const m = /^(?:([A-Z]{2,4})-)?([a-z]+)\.([a-z0-9]+)$/.exec(name || '');
-  if (!m || !MOMENTS.includes(m[2]) || ![...AUDIO, ...VIDEO].includes(m[3])) return null;
-  return { team: m[1] || null, moment: m[2], ext: m[3], video: VIDEO.includes(m[3]) };
+  if (!m || !MOMENTS.includes(m[2]) || ![...AUDIO, ...VIDEO, ...IMAGE].includes(m[3])) return null;
+  const type = VIDEO.includes(m[3]) ? 'video' : IMAGE.includes(m[3]) ? 'image' : 'audio';
+  return { team: m[1] || null, moment: m[2], ext: m[3], type, video: type === 'video' };
 }
 
 function listMedia() {
@@ -258,9 +260,9 @@ function saveMedia(req, res, name) {
   req.pipe(out);
   out.on('finish', () => {
     if (failed) return;
-    // One sound and one video per moment: replace the old one of the same kind.
+    // One sound, one video and one picture per moment: replace the old one of the same kind.
     for (const f of listMedia()) {
-      if (f.team === info.team && f.moment === info.moment && f.video === info.video) fs.rmSync(path.join(MEDIA_DIR, f.name), { force: true });
+      if (f.team === info.team && f.moment === info.moment && f.type === info.type) fs.rmSync(path.join(MEDIA_DIR, f.name), { force: true });
     }
     fs.renameSync(tmp, path.join(MEDIA_DIR, name));
     broadcast('media', listMedia());
@@ -314,6 +316,7 @@ function takeover(type, team) {
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
   '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp4': 'video/mp4', '.webm': 'video/webm',
 };
 

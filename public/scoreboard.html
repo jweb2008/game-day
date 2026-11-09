@@ -198,6 +198,7 @@
     to   { transform: translateY(1.4vmin);  filter: brightness(.82); }
   }
   .tko.anthem .small { margin-top: 9vmin; font-size: 6.4vmin; opacity: .7; }
+  .tko.anthem .full { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; margin: 0; object-fit: contain; background: #04060b; animation: none; }
 
   /* Banners: 3rd down and 2-point tries, over the scoreboard, not instead of it. */
   .banner {
@@ -485,10 +486,12 @@
 
   // A team's own file wins over the general one: KC-touchdown.mp4 before touchdown.mp4.
   function findMedia(moment, team) {
-    const pick = (video) => media.find((f) => f.moment === moment && f.team === team && f.video === video)
-      || media.find((f) => f.moment === moment && !f.team && f.video === video);
-    return { video: pick(true), audio: pick(false) };
+    const type = (f) => f.type || (f.video ? 'video' : 'audio');
+    const pick = (t) => media.find((f) => f.moment === moment && f.team === team && type(f) === t)
+      || media.find((f) => f.moment === moment && !f.team && type(f) === t);
+    return { video: pick('video'), audio: pick('audio'), image: pick('image') };
   }
+  const mediaUrl = (f) => `/media/${encodeURIComponent(f.name)}`;
 
   function teamsFor(follow) {
     const g = state && state.games && state.games[follow];
@@ -559,7 +562,8 @@
     const done = () => { if (onEnded) { const f = onEnded; onEnded = null; f(); } };
     const video = tkoEl.querySelector('video');
     if (video) {
-      video.muted = !soundOn || !!found.audio; // a separate sound file plays over a video's own sound
+      // A separate sound file plays over a video's own sound. Anthem videos stay quiet: the anthem is on TV.
+      video.muted = !soundOn || !!found.audio || found.quiet === true;
       video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
       video.addEventListener('ended', done);
       els.push(video);
@@ -591,12 +595,17 @@
     const colors = paint(tkoEl, us);
     let html;
     if (moment === 'anthem') {
-      html = `<div class="content">${flagHTML()}<div class="small">National Anthem</div></div>`;
+      // Your own flag (video or picture) if you uploaded one, otherwise the built-in waving flag.
+      found.quiet = true;
+      html = found.video ? `<video class="full" src="${mediaUrl(found.video)}" playsinline loop preload="auto"></video>`
+        : found.image ? `<img class="full" src="${mediaUrl(found.image)}" alt="">`
+        : `<div class="content">${flagHTML()}<div class="small">National Anthem</div></div>`;
     } else {
       const word = (WORDS[moment] || [moment]).map((w) => `<span>${esc(w)}</span>`).join('');
       const size = moment === 'win' ? 56 : moment === 'goal' ? 44 : 34; // shrunk to fit below if needed
       const visual = found.video
-        ? `<video src="/media/${encodeURIComponent(found.video.name)}" playsinline preload="auto"></video>`
+        ? `<video src="${mediaUrl(found.video)}" playsinline preload="auto"></video>`
+        : found.image ? `<img class="logo" src="${mediaUrl(found.image)}" alt="">`
         : (us && us.logo ? `<img class="logo" src="${esc(us.logo)}" alt="" onerror="this.remove()">` : '');
       const small = moment === 'win' ? `<div class="small">${esc((us && us.name) || follow)} win · Final</div>` : '';
       html = (moment === 'goal' ? '<div class="beacon"></div>' : '<div class="stripes"></div>') +

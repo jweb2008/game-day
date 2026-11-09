@@ -38,7 +38,9 @@ instead (DEFENSE when the other team has the ball). Scores and 3rd downs show on
 is showing; wins show for every team you follow.
 
 Sounds and videos are optional and live in `media/` (outside git). Name them for the moment, and
-optionally the team: `touchdown.mp4`, `KC-touchdown.mp3`, `BOS-win.mp3`, `defense.mp3`, `anthem.mp3`.
+optionally the team: `touchdown.mp4`, `KC-touchdown.mp3`, `BOS-win.mp3`, `defense.mp3`, `anthem.mp4`.
+Pictures (PNG, JPG, GIF, WebP) work too: on a score they replace the team logo, and for the anthem a
+picture or video replaces the built-in flag (anthem videos play muted, since the anthem is on TV).
 A team's own file wins over the general one. Add `?sound=0` to any screen that should stay quiet.
 
 Per-house overrides go in `config.local.json` next to `config.json` (not tracked in git).
