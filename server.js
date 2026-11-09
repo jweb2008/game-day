@@ -332,7 +332,8 @@ function serveStatic(req, res, urlPath) {
   if (!file.startsWith(publicDir)) return json(res, 403, { error: 'forbidden' });
   fs.readFile(file, (err, data) => {
     if (err) return json(res, 404, { error: 'not found' });
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    // no-cache: browsers check for a newer page every load, so updates show up without a hard refresh.
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 }
