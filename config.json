@@ -4,6 +4,10 @@
   "delaySeconds": 12,
   "pollSeconds": 5,
   "idlePollSeconds": 60,
+  "homeAssistant": {
+    "url": "http://192.168.1.51",
+    "webhook": "game_day_events"
+  },
   "teams": [
     {
       "league": "nhl",

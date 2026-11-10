@@ -169,6 +169,32 @@ function publish(event) {
   recentEvents.length = Math.min(recentEvents.length, 50);
   console.log('event:', JSON.stringify(event));
   broadcast('game', event);
+  if (event.type !== 'anthem' && event.type !== 'clear') sendToHA(event);
+}
+
+// ---- Home Assistant ------------------------------------------------------
+// Each event goes to a Home Assistant webhook the moment the screens show it (already on the delay),
+// so the lights fire off the same data at the same time as the takeovers.
+const haLink = { lastOk: null, lastError: null };
+
+async function sendToHA(event) {
+  const ha = config.homeAssistant;
+  if (!ha || !ha.url || !ha.webhook) return;
+  const url = `${ha.url.replace(/\/$/, '')}/api/webhook/${encodeURIComponent(ha.webhook)}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) throw new Error(`Home Assistant answered ${res.status}`);
+    haLink.lastOk = new Date().toISOString();
+    haLink.lastError = null;
+  } catch (err) {
+    haLink.lastError = `${new Date().toISOString()} ${err.message}`;
+    console.error('home assistant:', err.message);
+  }
 }
 const clients = new Set();
 
@@ -363,6 +389,7 @@ const server = http.createServer((req, res) => {
       live: live.games,
       feedError: lastFeedError,
       screens: clients.size,
+      homeAssistant: { url: config.homeAssistant?.url || null, ...haLink },
       events: recentEvents,
     });
   }

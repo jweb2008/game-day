@@ -30,6 +30,13 @@ bash /opt/game-day/update.sh
 | `POST /api/takeover?type=touchdown&team=KC` | Show a takeover now. Types: touchdown, fieldgoal, safety, twopoint, goal, win, third, defense, anthem, clear |
 | `GET /api/media`, `PUT`/`DELETE /api/media/KC-touchdown.mp4` | Sounds and videos for takeovers (the status page has an upload form) |
 
+## Home Assistant
+
+Every event (scores with their kind, 3rd downs, finals, and test takeovers) is POSTed as JSON to
+`{homeAssistant.url}/api/webhook/{homeAssistant.webhook}` (see `config.json`) at the moment the screens
+show it, already on the delay. A relay automation in Home Assistant turns each one into a `game_day`
+event, and the light automations trigger on those, so lights and screens fire together.
+
 ## Takeovers
 
 When a team you follow scores or wins, the scoreboard screens switch to a full-screen takeover on the

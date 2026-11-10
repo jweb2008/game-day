@@ -47,7 +47,7 @@
         <label>Team <select id="tteam"></select></label>
       </div>
       <div class="controls" id="tbuttons"></div>
-      <div class="note">Shows on every scoreboard screen right away (no delay). Anthem stays up until you press Clear.</div>
+      <div class="note">Shows on every screen right away (no delay), and fires the lights through Home Assistant the same as a real score. Anthem stays up until you press Clear.</div>
     </div>
     <div class="card">
       <h2>Sounds and videos</h2>
@@ -107,7 +107,10 @@
       $('feed').innerHTML =
         `Last feed read: ${ago(s.liveAt)}<br>Screens connected: ${s.screens}<br>` +
         `Following: ${s.teams.map((t) => esc(t.name)).join(', ')}<br>` +
-        (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>');
+        (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>') +
+        `<br>Home Assistant: ${!s.homeAssistant || !s.homeAssistant.url ? 'not set up'
+          : s.homeAssistant.lastError ? `<span class="err">${esc(s.homeAssistant.lastError)}</span>`
+          : s.homeAssistant.lastOk ? `<span class="ok">last event sent ${ago(s.homeAssistant.lastOk)}</span>` : 'no events sent yet'}`;
       $('events').innerHTML = s.events.length
         ? s.events.map((e) => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.follow)}</td><td>${esc(e.type === 'score' && e.kind ? e.kind : e.type)}${e.type === 'score' ? ` ${esc(e.team)} +${e.points}` : ''}${e.type === 'third' ? ` (${esc(e.offense || '?')} ball)` : ''}${e.test ? ' <span class=\"meta\">test</span>' : ''}${e.type === 'final' ? ` (winner ${esc(e.winner || '?')})` : ''}</td></tr>`).join('')
         : '<tr><td class="empty">None yet. Scores, starts and finals show here.</td></tr>';
