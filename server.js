@@ -216,10 +216,11 @@ function tick() {
 // ---- sounds and videos -------------------------------------------------
 // Files are named for the moment they play on, optionally for one team:
 // touchdown.mp4, KC-touchdown.mp3, BOS-win.mp3 (Dirty Water), anthem.mp3 ...
+// BOS-logo.webp replaces ESPN's logo for that team on every screen.
 // They live outside the code folder, so updates never touch them.
 
 const MEDIA_DIR = path.resolve(ROOT, config.mediaDir || 'media');
-const MOMENTS = ['touchdown', 'fieldgoal', 'safety', 'twopoint', 'goal', 'win', 'defense', 'anthem'];
+const MOMENTS = ['touchdown', 'fieldgoal', 'safety', 'twopoint', 'goal', 'win', 'defense', 'anthem', 'logo'];
 const AUDIO = ['mp3', 'm4a', 'wav', 'ogg'];
 const VIDEO = ['mp4', 'webm'];
 const IMAGE = ['png', 'jpg', 'jpeg', 'gif', 'webp'];

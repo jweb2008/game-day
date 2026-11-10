@@ -374,7 +374,7 @@
     return `
       <section class="team ${side}${lost ? ' lost' : ''}${hasBall ? ' has-ball' : ''}" style="--band:${band};--band-ink:${inkFor(band)}">
         <span class="ball"></span>
-        ${t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
+        ${logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
         <div class="who">
           ${city ? `<span class="city">${esc(city)}</span>` : ''}
           <span class="name">${esc(t.name)}</span>
@@ -500,8 +500,8 @@
       lpEl.style.setProperty('--lp1', c);
       lpEl.style.setProperty('--lp2', darken(c, 0.45));
       lpEl.style.setProperty('--lp-ink', inkFor(c));
-      lpLogo.hidden = !t.logo;
-      if (t.logo) lpLogo.src = t.logo;
+      lpLogo.hidden = !logoFor(t);
+      if (logoFor(t)) lpLogo.src = logoFor(t);
       lpName.textContent = t.fullName || t.name || '';
     }
     lpBug.innerHTML = params.get('bug') === '0' || !g ? '' : bugHTML(g);
@@ -571,6 +571,12 @@
     return { video: pick('video'), audio: pick('audio'), image: pick('image') };
   }
   const mediaUrl = (f) => `/media/${encodeURIComponent(f.name)}`;
+  // Your own logo for a team (BOS-logo.webp) wins over ESPN's, on every screen.
+  function logoFor(t) {
+    if (!t) return null;
+    const own = media.find((f) => f.moment === 'logo' && f.team === t.abbr && f.type === 'image');
+    return own ? mediaUrl(own) : t.logo;
+  }
 
   function teamsFor(follow) {
     const g = state && state.games && state.games[follow];
@@ -685,7 +691,7 @@
       const visual = found.video
         ? `<video src="${mediaUrl(found.video)}" playsinline preload="auto"></video>`
         : found.image ? `<img class="logo" src="${mediaUrl(found.image)}" alt="">`
-        : (us && us.logo ? `<img class="logo" src="${esc(us.logo)}" alt="" onerror="this.remove()">` : '');
+        : (logoFor(us) ? `<img class="logo" src="${esc(logoFor(us))}" alt="" onerror="this.remove()">` : '');
       const small = moment === 'win' ? `<div class="small">${esc((us && us.name) || follow)} win · Final</div>` : '';
       html = (moment === 'goal' ? '<div class="beacon"></div>' : '<div class="stripes"></div>') +
         (moment === 'win' ? confettiHTML(colors) : '') +
@@ -775,7 +781,7 @@
   function connect() {
     const es = new EventSource('/stream');
     es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
-    es.addEventListener('media', (e) => { media = JSON.parse(e.data); });
+    es.addEventListener('media', (e) => { media = JSON.parse(e.data); lpTeam = null; render(); });
     // The new score reaches the screen right after its event; wait a beat so the takeover shows it.
     es.addEventListener('game', (e) => { const ev = JSON.parse(e.data); setTimeout(() => onGameEvent(ev), 150); });
     es.onopen = () => { online = true; };

@@ -57,7 +57,7 @@
         <input type="file" id="mfile" accept=".mp3,.m4a,.wav,.ogg,.mp4,.webm,.png,.jpg,.jpeg,.gif,.webp">
         <button id="mupload">Upload</button>
       </div>
-      <div id="mstatus" class="note">A team's own file plays instead of the "Any team" one. One sound, one video and one picture per moment. For Anthem, a video or picture replaces the built-in flag.</div>
+      <div id="mstatus" class="note">A team's own file plays instead of the "Any team" one. One sound, one video and one picture per moment. For Anthem, a video or picture replaces the built-in flag. Team logo replaces ESPN's logo for that team everywhere.</div>
       <table id="mlist"></table>
     </div>
   </div>
@@ -117,7 +117,7 @@
   // ---- takeover tests and the sound/video store ----
   const TESTS = [['touchdown', 'Touchdown'], ['fieldgoal', 'Field goal'], ['safety', 'Safety'], ['twopoint', '2-point'],
     ['third', '3rd down'], ['defense', '3rd down (defense)'], ['goal', 'Goal'], ['win', 'Win'], ['anthem', 'Anthem'], ['clear', 'Clear']];
-  const MOMENT_NAMES = { touchdown: 'Touchdown', fieldgoal: 'Field goal', safety: 'Safety', twopoint: '2-point', goal: 'Goal', win: 'Win', defense: '3rd down defense', anthem: 'Anthem' };
+  const MOMENT_NAMES = { touchdown: 'Touchdown', fieldgoal: 'Field goal', safety: 'Safety', twopoint: '2-point', goal: 'Goal', win: 'Win', defense: '3rd down defense', anthem: 'Anthem', logo: 'Team logo (picture)' };
 
   async function setupTests() {
     const s = await (await fetch('/api/status')).json();
