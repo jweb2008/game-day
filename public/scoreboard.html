@@ -170,7 +170,6 @@
     animation: shadow 6s ease-in-out infinite alternate;
   }
   @keyframes shadow { from { transform: scaleX(1); opacity: .9; } to { transform: scaleX(.75); opacity: .5; } }
-  .lp-name { position: relative; margin-top: 2.5vmin; font-size: 7vmin; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--lp-ink); opacity: .9; }
   .bug {
     position: absolute; right: 4vmin; bottom: 4vmin; padding: 1.6vmin 3vmin;
     display: flex; gap: 2.6vmin; align-items: baseline;
@@ -282,7 +281,7 @@
   <p id="play" class="play"></p>
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
-  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="lp-name"></div><div class="bug"></div></div>
+  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="bug"></div></div>
   <div id="banner" class="banner" hidden></div>
   <div id="takeover" class="tko" hidden></div>
 </div>
@@ -500,7 +499,6 @@
   // Logo page: the logo and colors change only when the team does, so the animation never restarts.
   const lpEl = document.getElementById('logo-page');
   const lpLogo = lpEl.querySelector('.lp-logo');
-  const lpName = lpEl.querySelector('.lp-name');
   const lpBug = lpEl.querySelector('.bug');
   let lpTeam = null;
   function renderLogo(t, g) {
@@ -509,10 +507,8 @@
       const c = bandColor(t);
       lpEl.style.setProperty('--lp1', c);
       lpEl.style.setProperty('--lp2', darken(c, 0.45));
-      lpEl.style.setProperty('--lp-ink', inkFor(c));
       lpLogo.hidden = !logoFor(t);
       if (logoFor(t)) lpLogo.src = logoFor(t);
-      lpName.textContent = t.fullName || t.name || '';
     }
     lpBug.innerHTML = params.get('bug') === '0' || !g ? '' : bugHTML(g);
   }
@@ -580,7 +576,8 @@
       || media.find((f) => f.moment === moment && !f.team && type(f) === t);
     return { video: pick('video'), audio: pick('audio'), image: pick('image') };
   }
-  const mediaUrl = (f) => `/media/${encodeURIComponent(f.name)}`;
+  // ?v= changes when a file is replaced, so screens never show an old copy from cache.
+  const mediaUrl = (f) => `/media/${encodeURIComponent(f.name)}?v=${f.v || 0}`;
   // Your own logo for a team (BOS-logo.webp) wins over ESPN's, on every screen.
   function logoFor(t) {
     if (!t) return null;

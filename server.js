@@ -237,7 +237,7 @@ function listMedia() {
   if (!fs.existsSync(MEDIA_DIR)) return [];
   return fs.readdirSync(MEDIA_DIR)
     .filter((f) => mediaName(f))
-    .map((f) => ({ name: f, size: fs.statSync(path.join(MEDIA_DIR, f)).size, ...mediaName(f) }));
+    .map((f) => { const st = fs.statSync(path.join(MEDIA_DIR, f)); return { name: f, size: st.size, v: Math.round(st.mtimeMs), ...mediaName(f) }; });
 }
 
 function saveMedia(req, res, name) {
