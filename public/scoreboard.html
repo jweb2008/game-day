@@ -157,10 +157,20 @@
   .lp-logo {
     position: relative; width: 62vmin; height: 62vmin; object-fit: contain;
     filter: drop-shadow(0 3vmin 5vmin rgba(0,0,0,.45));
-    animation: breathe 7s ease-in-out infinite alternate;
+    animation: float 6s ease-in-out infinite alternate;
   }
-  @keyframes breathe { from { transform: scale(.97); } to { transform: scale(1.03); } }
-  .lp-name { position: relative; margin-top: 4vmin; font-size: 7vmin; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--lp-ink); opacity: .9; }
+  /* The logo floats: drifts up and down with a slight tilt, its shadow on the floor growing and shrinking. */
+  @keyframes float {
+    from { transform: translateY(2.2vmin) rotate(-1.2deg); }
+    to   { transform: translateY(-2.2vmin) rotate(1.2deg); }
+  }
+  .lp-shadow {
+    position: relative; width: 34vmin; height: 3.4vmin; margin-top: 1.5vmin; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0,0,0,.45), transparent 70%);
+    animation: shadow 6s ease-in-out infinite alternate;
+  }
+  @keyframes shadow { from { transform: scaleX(1); opacity: .9; } to { transform: scaleX(.75); opacity: .5; } }
+  .lp-name { position: relative; margin-top: 2.5vmin; font-size: 7vmin; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--lp-ink); opacity: .9; }
   .bug {
     position: absolute; right: 4vmin; bottom: 4vmin; padding: 1.6vmin 3vmin;
     display: flex; gap: 2.6vmin; align-items: baseline;
@@ -208,7 +218,7 @@
   .tko .word span { display: block; width: max-content; margin: 0 auto; animation: slam .55s cubic-bezier(.2,1.5,.4,1) both; }
   .tko .word span + span { animation-delay: .18s; }
   @keyframes slam { from { transform: scale(2.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .tko .logo { width: 44vmin; height: 44vmin; object-fit: contain; margin: 0 0 7vmin; animation: pop .7s .3s cubic-bezier(.2,1.4,.4,1) both; filter: drop-shadow(0 1.5vmin 2vmin rgba(0,0,0,.35)); }
+  .tko .logo { width: 44vmin; height: 44vmin; object-fit: contain; margin: 0 0 7vmin; animation: pop .7s .3s cubic-bezier(.2,1.4,.4,1) both, float 3s 1s ease-in-out infinite alternate; filter: drop-shadow(0 1.5vmin 2vmin rgba(0,0,0,.35)); }
   @keyframes pop { from { transform: scale(.2) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
   .tko video { width: 100%; max-height: 62vmax; margin: 6vmin 0; background: #000; object-fit: contain; animation: rise .5s .2s both; }
   .tko .line { margin-top: 8vmin; font-size: 10vmin; font-weight: 800; display: flex; gap: 6vmin; font-variant-numeric: tabular-nums; animation: rise .5s .6s both; }
@@ -272,7 +282,7 @@
   <p id="play" class="play"></p>
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
-  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-name"></div><div class="bug"></div></div>
+  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="lp-name"></div><div class="bug"></div></div>
   <div id="banner" class="banner" hidden></div>
   <div id="takeover" class="tko" hidden></div>
 </div>
