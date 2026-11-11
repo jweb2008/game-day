@@ -106,7 +106,9 @@
       const s = await (await fetch('/api/status')).json();
       $('feed').innerHTML =
         `Last feed read: ${ago(s.liveAt)}<br>Screens connected: ${s.screens}<br>` +
-        `Following: ${s.teams.map((t) => esc(t.name)).join(', ')}<br>` +
+        `Following: ${s.teams.map((t) => t.following ? esc(t.name) : `<s class="meta">${esc(t.name)}</s>`).join(', ')}` +
+        ` <span class="meta">(switches on the Game Day Dashboard)</span><br>` +
+        `Screens show: ${s.featured ? esc((s.teams.find((t) => t.abbr === s.featured) || {}).name || s.featured) : 'automatic (live game first)'}<br>` +
         (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>') +
         `<br>Home Assistant: ${!s.homeAssistant || !s.homeAssistant.url ? 'not set up'
           : s.homeAssistant.lastError ? `<span class="err">${esc(s.homeAssistant.lastError)}</span>`

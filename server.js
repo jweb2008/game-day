@@ -206,13 +206,24 @@ function broadcast(type, data) {
   for (const res of clients) send(res, type, data);
 }
 
+// Follow switches (set from Home Assistant): a team switched off is left off the screens and
+// sends no events. Teams never mentioned are followed.
+const following = (abbr) => !config.follow || config.follow[abbr] !== false;
+// Game picker: which followed team the screens feature; null means automatic.
+const featured = () => (config.featured && following(config.featured) ? config.featured : null);
+
+function followedGames(games) {
+  return Object.fromEntries(Object.entries(games || {}).filter(([abbr]) => following(abbr)));
+}
+
 function screenState() {
   return {
     delaySeconds: config.delaySeconds,
     timeZone: config.timeZone || null,
     buffering: shown === null,
     at: shown ? shown.at : null,
-    games: shown ? shown.games : {},
+    games: shown ? followedGames(shown.games) : {},
+    featured: featured(),
     ticker: shown ? shown.ticker || [] : [],
   };
 }
@@ -227,6 +238,7 @@ function tick() {
   const forward = !eventBase || Date.parse(next.at) > Date.parse(eventBase.at);
   if (eventBase && forward) {
     for (const [abbr, game] of Object.entries(next.games)) {
+      if (!following(abbr)) continue;
       for (const ev of diffGame(eventBase.games[abbr], game)) {
         const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
         if (ev.type === 'score') event.kind = scoreKind(ev, game);
@@ -383,7 +395,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/status') {
     return json(res, 200, {
       delaySeconds: config.delaySeconds,
-      teams: config.teams,
+      teams: config.teams.map((t) => ({ ...t, following: following(t.abbr) })),
+      featured: featured(),
       liveAt: live.at,
       shownAt: shown ? shown.at : null,
       live: live.games,
@@ -401,6 +414,25 @@ const server = http.createServer((req, res) => {
     saveLocal({ delaySeconds: seconds });
     broadcast('state', screenState());
     return json(res, 200, { delaySeconds: seconds });
+  }
+
+  if (url.pathname === '/api/follow' && req.method === 'POST') {
+    const team = String(url.searchParams.get('team') || '').toUpperCase();
+    if (!config.teams.some((t) => t.abbr === team)) return json(res, 400, { error: `team must be one of ${config.teams.map((t) => t.abbr).join(', ')}` });
+    const on = !/^(0|off|false)$/i.test(url.searchParams.get('on') || '1');
+    config.follow = { ...(config.follow || {}), [team]: on };
+    saveLocal({ follow: config.follow });
+    broadcast('state', screenState());
+    return json(res, 200, { follow: config.follow });
+  }
+
+  if (url.pathname === '/api/featured' && req.method === 'POST') {
+    const team = String(url.searchParams.get('team') || 'auto').toUpperCase();
+    if (team !== 'AUTO' && !config.teams.some((t) => t.abbr === team)) return json(res, 400, { error: 'team must be auto or a followed team' });
+    config.featured = team === 'AUTO' ? null : team;
+    saveLocal({ featured: config.featured });
+    broadcast('state', screenState());
+    return json(res, 200, { featured: config.featured });
   }
 
   if (url.pathname === '/api/takeover' && req.method === 'POST') {

@@ -314,6 +314,8 @@
   function pickGame(games) {
     const list = Object.entries(games);
     if (wanted) return list.find(([abbr]) => abbr === wanted) || null;
+    // The game picker on the dashboard, when set, beats the automatic choice.
+    if (state && state.featured) { const f = list.find(([abbr]) => abbr === state.featured); if (f) return f; }
     const by = (s) => list.filter(([, g]) => g.state === s);
     const live = by('in');
     if (live.length) return live[0];
