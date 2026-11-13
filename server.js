@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
+const { fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
 
@@ -53,11 +53,39 @@ function leagues() {
 
 const scheduleCache = new Map(); // abbr -> { t, game }
 
+// League team lists (colors, logos), refreshed once a day, to fill gaps in schedule data.
+const teamDirs = new Map(); // league -> { t, map }
+async function teamDirectory(lg) {
+  const cached = teamDirs.get(lg.league);
+  if (cached && Date.now() - cached.t < 24 * 3600 * 1000) return cached.map;
+  try {
+    const map = await fetchTeams(lg.sport, lg.league);
+    teamDirs.set(lg.league, { t: Date.now(), map });
+    return map;
+  } catch (err) {
+    console.error('teams error:', err.message);
+    if (cached) return cached.map;
+    teamDirs.set(lg.league, { t: Date.now() - 23 * 3600 * 1000, map: {} }); // try again in an hour
+    return {};
+  }
+}
+
+function fillTeam(t, dir) {
+  const d = t && dir[t.abbr];
+  if (!d) return;
+  t.color = t.color || d.color;
+  t.altColor = t.altColor || d.altColor;
+  t.name = t.name || d.name;
+  t.fullName = t.fullName || d.fullName;
+  if (d.logo && (!t.logo || /\/500\/[a-z]+\.png$/.test(t.logo))) t.logo = d.logo;
+}
+
 async function nextFromSchedule(lg, abbr) {
   const cached = scheduleCache.get(abbr);
   if (cached && Date.now() - cached.t < 15 * 60 * 1000) return cached.game;
   try {
     const game = pickFromSchedule(await fetchTeamSchedule(lg.sport, lg.league, abbr), lg.league);
+    if (game) { const dir = await teamDirectory(lg); fillTeam(game.home, dir); fillTeam(game.away, dir); }
     scheduleCache.set(abbr, { t: Date.now(), game });
     return game;
   } catch (err) {
