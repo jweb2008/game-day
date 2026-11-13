@@ -139,6 +139,48 @@
   }
   #rest { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
+
+  /* ---- Team screen (?side=away or ?side=home): one team per TV, like the two benches ---- */
+  #side { display: none; }
+  body.side #top, body.side #rest { display: none; }
+  body.side #side { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+  #side > * { flex-shrink: 0; }
+  #side > .sd-mid { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  body.side { background: var(--sd-dark); }
+  .sd-hero {
+    position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 3vmin 5vmin 7vmin; background: var(--sd-band); color: var(--sd-ink);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5vmin), 0 100%);
+    transition: filter .8s;
+  }
+  .sd-hero.lost { filter: saturate(.3) brightness(.65); }
+  .sd-tag { font-size: 4vmin; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
+  .sd-logo { width: 40vmin; height: 40vmin; object-fit: contain; margin: 2vmin 0 2vmin;
+    filter: drop-shadow(0 2.5vmin 3vmin rgba(0,0,0,.35)); animation: float 6s ease-in-out infinite alternate; }
+  .sd-city { font-size: 5vmin; font-weight: 500; opacity: .85; line-height: 1; }
+  .sd-name { font-size: 12vmin; font-weight: 800; line-height: .9; text-transform: uppercase; }
+  .sd-record { font-size: 4.4vmin; font-weight: 500; opacity: .8; margin-top: 1vmin; }
+  .sd-score-row { display: flex; align-items: center; justify-content: center; gap: 4vmin; margin-top: 1vmin; }
+  .sd-score { font-size: 30vmin; font-weight: 800; line-height: .82; font-variant-numeric: tabular-nums; color: #f5f3ee; }
+  .sd-score.scored { animation: scored 1.6s ease-out 1; }
+  .sd-ball { width: 5vmin; height: 5vmin; border-radius: 50%; background: var(--sd-band); box-shadow: 0 0 0 1vmin rgba(255,255,255,.85); opacity: 0; transition: opacity .4s; }
+  .sd-ball.on { opacity: 1; }
+  .sd-flag { text-align: center; font-size: 7vmin; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #f5f3ee; margin-top: 1vmin; }
+  .sd-flag:empty { display: none; }
+  .sd-flag.win { color: var(--sd-band-bright); }
+  .sd-sit { margin: 2vmin 5vmin 0; padding: 2vmin 3.5vmin; font-size: 6.2vmin; font-weight: 800; color: #f5f3ee;
+    border-left: 1.6vmin solid var(--sd-band-bright); background: rgba(255,255,255,.06); }
+  .sd-sit.red-zone { border-left-color: #ff4d4d; }
+  .sd-sit:empty { display: none; }
+  .sd-stats { margin: 3vmin 6vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
+  .sd-stat { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 1vmin; }
+  .sd-stat .l { font-size: 4.4vmin; font-weight: 500; color: var(--muted); }
+  .sd-stat .v { font-size: 5.8vmin; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .sd-stat .bar { grid-column: 1 / -1; height: 1.3vmin; background: rgba(255,255,255,.08); }
+  .sd-stat .bar i { display: block; height: 100%; background: var(--sd-band-bright); transition: width .8s; }
+  .sd-countdown { text-align: center; margin-top: 6vmin; color: #f5f3ee; }
+  .sd-countdown .big { font-size: 17vmin; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+  .sd-countdown .sub { font-size: 5.4vmin; color: var(--muted); margin-top: 2vmin; font-weight: 500; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
   body.wide #app { width: 100vw; height: 100vh; }
   #logo-page { display: none; }
@@ -278,6 +320,14 @@
 <body>
 <div id="app">
   <div id="top"><div class="empty">Connecting to Game Day…</div></div>
+  <div id="side">
+    <div class="status sd-status"></div>
+    <div class="sd-hero"><div class="sd-tag"></div><img class="sd-logo" alt="" hidden onerror="this.hidden=true"><div class="sd-city"></div><div class="sd-name"></div><div class="sd-record"></div></div>
+    <div class="sd-score-row"><span class="sd-ball"></span><span class="sd-score"></span><span class="sd-ball" style="visibility:hidden"></span></div>
+    <div class="sd-flag"></div>
+    <div class="sd-sit"></div>
+    <div class="sd-mid"></div>
+  </div>
   <p id="play" class="play"></p>
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
@@ -296,6 +346,9 @@
   // With no setting, a landscape window is turned right automatically.
   // ?view=logo: the projector page, a big team logo in team colors, landscape.
   const logoView = (params.get('view') || '').toLowerCase() === 'logo';
+  // ?side=away (left TV) or ?side=home (right TV): one team per screen.
+  const sideView = ['home', 'away'].includes((params.get('side') || '').toLowerCase()) ? params.get('side').toLowerCase() : null;
+  document.body.classList.toggle('side', !!sideView);
   document.body.classList.toggle('wide', logoView);
   function applyTurn() {
     const turn = (params.get('turn') || (logoView ? 'none' : '')).toLowerCase();
@@ -525,6 +578,73 @@
     return `<span${dim(g.away, g.home)}>${esc(g.away.abbr)} ${g.away.score}</span><span${dim(g.home, g.away)}>${esc(g.home.abbr)} ${g.home.score}</span>${when}`;
   }
 
+  // Team screen: the hero (logo, name) is rebuilt only when the team changes, so the logo keeps floating.
+  const sdEl = document.getElementById('side');
+  const sd = (c) => sdEl.querySelector(c);
+  let sdKey = null, sdScore = null;
+  function renderSide(g) {
+    const t = g[sideView], opp = g[sideView === 'home' ? 'away' : 'home'];
+    if (!t) return;
+    const band = bandColor(t);
+    const key = `${g.id}:${t.abbr}:${logoFor(t)}`;
+    if (key !== sdKey) {
+      sdKey = key; sdScore = null;
+      const bright = luminance(band) < 0.06 ? (t.altColor || '#f5f3ee') : band;
+      document.body.style.setProperty('--sd-band', band);
+      document.body.style.setProperty('--sd-ink', inkFor(band));
+      document.body.style.setProperty('--sd-dark', darken(band, 0.22));
+      document.body.style.setProperty('--sd-band-bright', bright);
+      document.body.style.setProperty('--accent', bright);
+      const city = t.fullName && t.name && t.fullName.endsWith(t.name) ? t.fullName.slice(0, -t.name.length).trim() : '';
+      sd('.sd-tag').textContent = sideView;
+      const logo = logoFor(t);
+      sd('.sd-logo').hidden = !logo;
+      if (logo) sd('.sd-logo').src = logo;
+      sd('.sd-city').textContent = city;
+      sd('.sd-name').textContent = t.name || t.abbr;
+    }
+    sd('.sd-record').textContent = t.record || '';
+    sd('.sd-status').innerHTML = statusBar(g).replace(/^<header class="status">|<\/header>$/g, '');
+    const won = g.state === 'post' && t.winner;
+    const lost = g.state === 'post' && !t.winner && opp && opp.winner;
+    sd('.sd-hero').classList.toggle('lost', !!lost);
+    const scoreEl = sd('.sd-score');
+    if (g.state === 'pre') { scoreEl.textContent = ''; }
+    else {
+      if (sdScore !== null && t.score > sdScore) { scoreEl.classList.remove('scored'); void scoreEl.offsetWidth; scoreEl.classList.add('scored'); }
+      scoreEl.textContent = t.score;
+      sdScore = t.score;
+    }
+    sd('.sd-ball').classList.toggle('on', g.state === 'in' && !!g.possession && g.possession === t.id);
+    const flag = sd('.sd-flag');
+    flag.className = 'sd-flag' + (won ? ' win' : '');
+    flag.textContent = won ? 'Win' : lost ? 'Final' : '';
+    const hasBall = g.state === 'in' && g.possession === t.id && g.downDistance;
+    const sit = sd('.sd-sit');
+    sit.className = 'sd-sit' + (hasBall && g.redZone ? ' red-zone' : '');
+    sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
+    let mid = '';
+    if (g.state === 'pre') {
+      const ms = Date.parse(g.start) - Date.now();
+      if (ms > 0 && ms < 7 * 24 * 3600 * 1000) {
+        const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60, days = Math.floor(h / 24);
+        const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+        mid = `<div class="sd-countdown"><div class="big">${big}</div><div class="sub">until ${g.league === 'nhl' ? 'puck drop' : 'kickoff'}</div></div>`;
+      }
+    } else if ((g.stats || []).length) {
+      // This team's numbers; each bar is measured against the other team's.
+      mid = '<div class="sd-stats">' + g.stats.slice(0, 6).map((r) => {
+        const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
+        const max = Math.max(r.homeAmount, r.awayAmount) || 1;
+        return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
+          `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
+      }).join('') + '</div>';
+    }
+    sd('.sd-mid').innerHTML = mid;
+    setPlay(g.state === 'in' ? g.lastPlay : '');
+    if (!tickerRunning) runTicker();
+  }
+
   function render() {
     if (!state) return;
     if (state.buffering) { topEl.innerHTML = `<div class="empty">Lining up with your TV (${state.delaySeconds}s)…</div>`; restEl.innerHTML = ''; setPlay(''); return; }
@@ -541,6 +661,7 @@
     featuredId = g.id;
     const featured = [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
     if (logoView) return renderLogo(featured, g);
+    if (sideView) return renderSide(g);
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
     topEl.innerHTML = statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + situation(g);
@@ -790,7 +911,7 @@
   function connect() {
     const es = new EventSource('/stream');
     es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
-    es.addEventListener('media', (e) => { media = JSON.parse(e.data); lpTeam = null; render(); });
+    es.addEventListener('media', (e) => { media = JSON.parse(e.data); lpTeam = null; sdKey = null; render(); });
     // The new score reaches the screen right after its event; wait a beat so the takeover shows it.
     es.addEventListener('game', (e) => { const ev = JSON.parse(e.data); setTimeout(() => onGameEvent(ev), 150); });
     es.onopen = () => { online = true; };

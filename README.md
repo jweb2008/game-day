@@ -23,6 +23,7 @@ bash /opt/game-day/update.sh
 | --- | --- |
 | `/` | Status page: followed games (delayed), feed health, recent events |
 | `/scoreboard.html` | Portrait scoreboard for a TV; `?team=KC` picks a game, otherwise live, then next, then latest final |
+| `/scoreboard.html?side=away` (or `side=home`) | Team screen for one side: that team's colors, floating logo, score, possession, its own stats; same takeovers. Left TCL away, right TCL home |
 | `/projector.html` | Projector logo page: the featured team's logo in team colors, a small score bug (`?bug=0` hides it), same takeovers; landscape |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
