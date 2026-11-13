@@ -24,10 +24,10 @@ bash /opt/game-day/update.sh
 | `/` | Status page: followed games (delayed), feed health, recent events |
 | `/scoreboard.html` | Portrait scoreboard for a TV; `?team=KC` picks a game, otherwise live, then next, then latest final |
 | `/scoreboard.html?side=away` (or `side=home`) | Team screen for one side: that team's colors, floating logo, score, possession, its own stats; same takeovers. Left TCL away, right TCL home |
-| `/projector.html` | Projector logo page: the featured team's logo in team colors, a small score bug (`?bug=0` hides it), same takeovers; landscape |
+| `/projector.html` | Projector logo page: the featured team's logo in team colors, logos only (`?bug=1` adds a small score box, `?takeovers=0` skips takeovers); landscape |
 | `/calendar.html` | Calendar: pick a sport, league, day and game (39 leagues: team sports, tennis and UFC matches, golf and racing events) to watch, and who the room cheers for. The game joins the screens 3 hours before start (ahead of your own teams) and leaves 90 minutes after the final |
 | `GET /api/leagues`, `GET /api/calendar?league=nfl&date=20261115`, `GET/POST/DELETE /api/watch` | Calendar data and the watch list (saved in `config.local.json`) |
-| `/scoreboard.html?view=field` (or `/projector.html?view=field`) | Field view for a wide screen (football): the drive on a field, line of scrimmage, first-down line, last play with headshots; the scoring drive for a minute after a score. Other sports and pregame show the logo page |
+| `/scoreboard.html?view=field` | Field view for a wide screen (football): the drive on a field, line of scrimmage, first-down line, last play with headshots; the scoring drive for a minute after a score. Other sports and pregame show the logo page |
 | `/api/debug/summary?game=<id>` | What the app read from ESPN's game summary (`&raw=1` for the raw JSON), for troubleshooting |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |

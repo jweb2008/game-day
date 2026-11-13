@@ -2,7 +2,10 @@
 <meta charset="utf-8">
 <title>Projector</title>
 <script>
-  // Short address for the projector: /projector.html is the scoreboard's logo page.
-  const extra = location.search.replace(/^\?/, '');
-  location.replace('scoreboard.html?view=logo' + (extra ? '&' + extra : ''));
+  // Short address for the projector: the scoreboard's logo page. Logos only by default;
+  // add ?bug=1 for the small score box, ?takeovers=0 to skip the TOUCHDOWN/GOAL/WIN screens.
+  const q = new URLSearchParams(location.search);
+  if (!q.has('bug')) q.set('bug', '0');
+  q.set('view', 'logo');
+  location.replace('scoreboard.html?' + q.toString());
 </script>

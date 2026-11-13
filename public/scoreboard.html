@@ -252,6 +252,24 @@
   .gi-face span { display: block; font-size: 2.8vmin; font-weight: 600; color: var(--muted); margin-top: .6vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .gi-text { font-size: 4.2vmin; font-weight: 600; line-height: 1.25; color: #f5f3ee; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .gi-text small { display: block; font-size: 3.4vmin; color: var(--muted); font-weight: 500; margin-bottom: .6vmin; }
+
+  /* Team screen panel: stats and drive chart, cross-fading. */
+  .sd-panes { position: relative; height: 100%; }
+  .sd-pane { position: absolute; inset: 0; transition: opacity .8s ease; }
+  .sd-pane.drive { opacity: 0; }
+  .sd-panes.show-drive .sd-pane.drive { opacity: 1; }
+  .sd-panes.show-drive .sd-pane.stats { opacity: 0; }
+  /* While the drive chart shows, the big logo tucks away to give the field room. */
+  body.side.drive-on .sd-logo, body.side.drive-on .sd-city, body.side.drive-on .sd-record, body.side.drive-on .sd-tag,
+  body.side.drive-on .sd-sit, body.side.drive-on #play { display: none; }
+  body.side.drive-on .sd-hero { padding-bottom: 6vmin; }
+  .sd-drive-head { margin: 3vmin 5vmin 0; font-size: 5.6vmin; font-weight: 800; color: #f5f3ee; letter-spacing: .04em; text-transform: uppercase; }
+  .sd-drive-head small { display: block; font-size: 4vmin; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; margin-top: .6vmin; }
+  .sd-drive-head.score { color: #ffd166; }
+  .sd-field { margin: 2.4vmin 5vmin 0; aspect-ratio: 3 / 2; border-radius: 1.2vmin; overflow: hidden; }
+  .sd-field svg { width: 100%; height: 100%; display: block; }
+  .sd-drive-play { margin: 2.4vmin 5vmin 0; font-size: 4.2vmin; font-weight: 600; line-height: 1.25; color: #f5f3ee;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
   body.wide #app { width: 100vw; height: 100vh; }
   #logo-page { display: none; }
@@ -772,16 +790,19 @@
         const max = Math.max(v, o) || 1;
         return `<div class="sd-stat"><span class="l">Set ${i + 1}</span><span class="v">${v}</span><div class="bar"><i style="width:${Math.round((v / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
-    } else if ((g.stats || []).length) {
+    } else if ((g.stats || []).length || (g.drives && (g.drives.current || g.drives.last || g.drives.lastScore))) {
       // This team's numbers; each bar is measured against the other team's.
-      mid = '<div class="sd-stats">' + g.stats.slice(0, 6).map((r) => {
+      const stats = '<div class="sd-stats">' + (g.stats || []).slice(0, 6).map((r) => {
         const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
         const max = Math.max(r.homeAmount, r.awayAmount) || 1;
         return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
           `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
+      const drive = sideDrive(g, t);
+      mid = drive ? `<div class="sd-panes${panelShowsDrive(g, t) ? ' show-drive' : ''}"><div class="sd-pane stats">${stats}</div><div class="sd-pane drive">${drive}</div></div>` : stats;
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
+    document.body.classList.toggle('drive-on', mid.includes('sd-panes show-drive'));
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }
@@ -826,23 +847,24 @@
     return `<div class="gi-team ${side}${ball ? ' ball' : ''}">${inner}</div>`;
   }
 
-  function fieldSVG(g, drive, offense, defense, scoring) {
-    const W = 1200, H = 420, X = (yte) => 100 + (100 - yte) * 10; // yards to end zone -> x
+  function fieldSVG(g, drive, offense, defense, scoring, H = 420, big = false) {
+    const fs = big ? 46 : 26, ez = big ? 70 : 40, maxRow = big ? 60 : 30; // bigger marks for a TCL
+    const W = 1200, X = (yte) => 100 + (100 - yte) * 10; // yards to end zone -> x
     const oc = bandColor(offense || {}), dc = bandColor(defense || {});
     let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">`;
     svg += `<rect width="${W}" height="${H}" fill="#1f5b33"/>`;
     for (let i = 0; i < 10; i++) if (i % 2) svg += `<rect x="${100 + i * 100}" width="100" height="${H}" fill="#226338"/>`;
     svg += `<rect width="100" height="${H}" fill="${oc}" opacity=".85"/><rect x="1100" width="100" height="${H}" fill="${dc}" opacity=".85"/>`;
-    svg += `<text x="50" y="${H / 2}" fill="${inkFor(oc)}" font-size="40" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 50 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(offense?.abbr || '')}</text>`;
-    svg += `<text x="1150" y="${H / 2}" fill="${inkFor(dc)}" font-size="40" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(90 1150 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(defense?.abbr || '')}</text>`;
+    svg += `<text x="50" y="${H / 2}" fill="${inkFor(oc)}" font-size="${ez}" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 50 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(offense?.abbr || '')}</text>`;
+    svg += `<text x="1150" y="${H / 2}" fill="${inkFor(dc)}" font-size="${ez}" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(90 1150 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(defense?.abbr || '')}</text>`;
     for (let yd = 10; yd < 100; yd += 10) {
       const x = 100 + yd * 10, n = yd <= 50 ? yd : 100 - yd;
       svg += `<line x1="${x}" x2="${x}" y1="0" y2="${H}" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>`;
-      svg += `<text x="${x}" y="${H - 14}" fill="#fff" fill-opacity=".55" font-size="26" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif">${n}</text>`;
+      svg += `<text x="${x}" y="${H - 14}" fill="#fff" fill-opacity=".55" font-size="${fs}" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif">${n}</text>`;
     }
     const plays = ((drive && drive.plays) || []).filter((p) => p.from != null && p.to != null);
     const shown = plays.slice(-12);
-    const top = 78, rowH = Math.min(30, (H - top - 60) / Math.max(shown.length, 6));
+    const top = big ? 40 : 78, rowH = Math.min(maxRow, (H - top - (big ? 90 : 60)) / Math.max(shown.length, 6));
     shown.forEach((p, i) => {
       const x1 = X(p.from), x2 = X(p.to), y = top + i * rowH;
       const gain = p.to <= p.from;
@@ -856,12 +878,12 @@
     // Line of scrimmage and the first-down line, from the live situation.
     if (!scoring && g.state === 'in' && g.yardsToEndzone != null) {
       const los = X(g.yardsToEndzone);
-      svg += `<line x1="${los}" x2="${los}" y1="0" y2="${H}" stroke="#4f8cff" stroke-width="6"/>`;
+      svg += `<line x1="${los}" x2="${los}" y1="0" y2="${H}" stroke="#4f8cff" stroke-width="${big ? 10 : 6}"/>`;
       if (g.distance && g.distance < g.yardsToEndzone) {
         const fd = X(g.yardsToEndzone - g.distance);
-        svg += `<line x1="${fd}" x2="${fd}" y1="0" y2="${H}" stroke="#ffd166" stroke-width="6"/>`;
+        svg += `<line x1="${fd}" x2="${fd}" y1="0" y2="${H}" stroke="#ffd166" stroke-width="${big ? 10 : 6}"/>`;
       }
-      svg += `<ellipse cx="${los}" cy="${H - 48}" rx="16" ry="10" fill="#8b4a1c" stroke="#fff" stroke-width="2"/>`;
+      svg += `<ellipse cx="${los}" cy="${H - (big ? 80 : 48)}" rx="${big ? 26 : 16}" ry="${big ? 16 : 10}" fill="#8b4a1c" stroke="#fff" stroke-width="2"/>`;
     }
     return svg + '</svg>';
   }
@@ -888,6 +910,48 @@
     const playEl = giEl.querySelector('.gi-play');
     if (playEl._html !== html) { playEl._html = html; playEl.innerHTML = html; }
   }
+
+  // ---- Team screens: stats and the drive chart take turns ----
+  // ?panel=cycle (default) swaps every 5 minutes (?cycle=<seconds> to change it), the two TVs out of step so one shows the drive while
+  // the other shows stats. ?panel=stats or ?panel=drive holds one. After a touchdown or field goal the
+  // scoring team's screen shows the scoring drive for a minute.
+  const panelMode = (params.get('panel') || 'cycle').toLowerCase();
+  const CYCLE_MS = Math.max(10, Number(params.get('cycle')) || 300) * 1000;
+  let scoringTeam = null;
+
+  function panelShowsDrive(g, t) {
+    if (Date.now() < scoreDriveUntil && g.drives && g.drives.lastScore) return scoringTeam === t.abbr;
+    if (panelMode === 'drive') return true;
+    if (panelMode === 'stats') return false;
+    const phase = Math.floor(Date.now() / CYCLE_MS) % 2;
+    return (phase === 0) === (sideView !== 'home');
+  }
+
+  function sideDrive(g, t) {
+    if (!/nfl|football|cfl|ufl/.test(g.league) || !g.drives) return '';
+    const d = g.drives;
+    const scoring = Date.now() < scoreDriveUntil && d.lastScore && scoringTeam === t.abbr;
+    const drive = scoring ? d.lastScore : (d.current || d.last);
+    if (!drive) return '';
+    const offense = [g.home, g.away].find((x) => x && x.abbr === drive.team) || t;
+    const defense = offense === g.home ? g.away : g.home;
+    const plays = drive.plays || [];
+    const last = plays[plays.length - 1];
+    const title = scoring ? `Scoring drive · ${offense.abbr}` : `${offense.abbr} drive`;
+    return `<div class="sd-drive-head${scoring ? ' score' : ''}">${esc(title)}<small>${esc(drive.description || '')}</small></div>` +
+      `<div class="sd-field">${fieldSVG(g, drive, offense, defense, scoring, 800, true)}</div>` +
+      (last ? `<div class="sd-drive-play">${esc(last.text)}</div>` : '');
+  }
+
+  // Flip the panels on the beat without waiting for new data.
+  if (sideView) setInterval(() => {
+    const panes = document.querySelector('#side .sd-panes');
+    if (!panes || !state) return;
+    const pick = pickGame(state.games || {});
+    if (!pick) return;
+    const g = pick[1], t = g[sideView];
+    if (t) { const on = panelShowsDrive(g, t); panes.classList.toggle('show-drive', on); document.body.classList.toggle('drive-on', on); }
+  }, 1000);
 
   function render() {
     if (!state) return;
@@ -1138,6 +1202,7 @@
   }
 
   function onGameEvent(ev) {
+    if (params.get('takeovers') === '0') return; // a logos-only screen
     if (ev.type === 'anthem') return startTakeover({ moment: 'anthem', follow: featuredFollow() });
     if (ev.type === 'clear') {
       queue.length = 0;
@@ -1150,7 +1215,8 @@
     // Who the room cheers for: your team, or the side(s) picked on the calendar.
     const cheer = ev.cheerTeams || [ev.follow];
     if (ev.type === 'score' && (ev.kind === 'touchdown' || ev.kind === 'fieldgoal') && ev.follow === featuredFollow()) {
-      scoreDriveUntil = Date.now() + 60000; // the field view shows the scoring drive for a minute
+      scoreDriveUntil = Date.now() + 60000; // the drive chart shows the scoring drive for a minute
+      scoringTeam = ev.team;
       setTimeout(render, 2500);
     }
     if (ev.type === 'score' && cheer.includes(ev.team) && mine) {
