@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Day calendar</title>
+<style>
+  :root { --bg: #0b0f17; --card: #151b27; --line: #263044; --text: #e8edf5; --muted: #8b97ab; --accent: #4f8cff; --good: #3fbf7f; --bad: #e5484d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 20px 16px 40px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 2px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .sub a { color: #9fb5d9; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; font: inherit; font-size: 14px; color: var(--text); background: #1d2533; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; white-space: nowrap; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .day { display: flex; flex-direction: column; align-items: center; min-width: 58px; border-radius: 12px; padding: 6px 8px; line-height: 1.15; }
+  .day small { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; opacity: .8; }
+  .day b { font-size: 18px; }
+  .nav { display: flex; align-items: center; gap: 8px; }
+  .nav .chips { flex: 1; }
+  .arrow { flex: none; font: inherit; color: var(--text); background: #1d2533; border: 1px solid var(--line); border-radius: 10px; width: 36px; height: 52px; cursor: pointer; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .game { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .game.watching { border-color: var(--good); box-shadow: inset 4px 0 0 var(--good); }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .teams { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .team { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .team img { width: 30px; height: 30px; object-fit: contain; flex: none; }
+  .team .ph { width: 30px; height: 30px; border-radius: 50%; flex: none; }
+  .team .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .rec { color: var(--muted); font-size: 13px; flex: none; }
+  .team .sc { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .when { flex: none; text-align: right; font-size: 14px; color: var(--muted); min-width: 92px; }
+  .when b { display: block; color: var(--text); font-size: 15px; }
+  .when .live { color: #ff8a8a; font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  button.act { font: inherit; font-size: 14px; color: var(--text); background: #1d2533; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; cursor: pointer; }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.act.danger { color: #ff9ea1; }
+  .ask { color: var(--muted); font-size: 14px; width: 100%; }
+  .tag { font-size: 13px; color: var(--good); font-weight: 600; }
+  .empty { color: var(--muted); padding: 14px 2px; }
+  .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Game Day calendar</h1>
+  <div class="sub">Pick a game and the room treats it like one of your teams: screens, takeovers and lights. <a href="/">Status page</a></div>
+
+  <h2>Watching</h2>
+  <div class="list" id="watching"></div>
+
+  <h2>Find a game</h2>
+  <div class="chips" id="leagues"></div>
+  <div class="nav" style="margin-top:10px">
+    <button class="arrow" id="prev" aria-label="Earlier days">‹</button>
+    <div class="chips" id="days"></div>
+    <button class="arrow" id="next" aria-label="Later days">›</button>
+  </div>
+  <div class="list" id="games" style="margin-top:14px"></div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const TZ = 'America/Denver';
+  const CHEER_WORDS = { home: (g) => g.home.name, away: (g) => g.away.name, both: () => 'both teams', none: () => 'nobody (screens only)' };
+
+  // Remember the last league picked on this device.
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  let leagues = [];
+  let league = store.get('gd-league') || 'nfl';
+  let start = 0;          // first day shown, in days from today
+  let dayOffset = 0;      // the day picked
+  let asking = null;      // game id with the cheer question open
+
+  function ymd(offset) {
+    const d = new Date(Date.now() + offset * 86400000);
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d).map((x) => [x.type, x.value]));
+    return `${p.year}${p.month}${p.day}`;
+  }
+  const dayLabel = (offset) => new Date(Date.now() + offset * 86400000);
+  const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
+  const dateTime = (iso) => new Date(iso).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: TZ });
+
+  function teamRow(t, g) {
+    const pic = t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">`
+      : `<span class="ph" style="background:${esc(t.color || '#2a3342')}"></span>`;
+    const sc = g && g.state !== 'pre' && t.score != null ? `<span class="sc">${t.score}</span>` : '';
+    return `<div class="team">${pic}<span class="nm">${esc(t.fullName || t.name || t.abbr)}</span>${t.record ? `<span class="rec">${esc(t.record)}</span>` : ''}${sc}</div>`;
+  }
+
+  async function api(path, method = 'GET') {
+    const r = await fetch(path, { method });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    return j;
+  }
+
+  async function loadWatching() {
+    const list = await api('/api/watch');
+    $('watching').innerHTML = list.length ? list.map((w) => `
+      <div class="game watching">
+        <div class="row">
+          <div class="teams">${teamRow(w.away)}${teamRow(w.home)}</div>
+          <div class="when"><b>${esc(dateTime(w.start))}</b>${esc((leagues.find((l) => l.key === w.league) || {}).name || w.league)}</div>
+        </div>
+        <div class="actions">
+          <span class="tag">Cheering for ${esc(CHEER_WORDS[w.cheer]({ home: w.home, away: w.away }))}</span>
+          <button class="act danger" data-unwatch="${esc(w.id)}" style="margin-left:auto">Remove</button>
+        </div>
+      </div>`).join('') : '<div class="empty">No games picked yet. Find one below.</div>';
+  }
+
+  function renderLeagues() {
+    $('leagues').innerHTML = leagues.map((l) => `<button class="chip${l.key === league ? ' on' : ''}" data-league="${l.key}">${esc(l.name)}</button>`).join('');
+  }
+
+  function renderDays() {
+    let html = '';
+    for (let i = start; i < start + 14; i++) {
+      const d = dayLabel(i);
+      const top = i === 0 ? 'Today' : d.toLocaleDateString([], { weekday: 'short', timeZone: TZ });
+      html += `<button class="chip day${i === dayOffset ? ' on' : ''}" data-day="${i}"><small>${top}</small><b>${d.toLocaleDateString([], { month: 'numeric', day: 'numeric', timeZone: TZ })}</b></button>`;
+    }
+    $('days').innerHTML = html;
+    const on = $('days').querySelector('.on');
+    if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  async function loadGames() {
+    const date = ymd(dayOffset);
+    $('games').innerHTML = '<div class="empty">Loading…</div>';
+    let games;
+    try { games = await api(`/api/calendar?league=${encodeURIComponent(league)}&date=${date}`); }
+    catch (err) { $('games').innerHTML = `<div class="empty err">Couldn't load games: ${esc(err.message)}</div>`; return; }
+    if (!games.length) { $('games').innerHTML = '<div class="empty">No games that day.</div>'; return; }
+    $('games').innerHTML = games.map((g) => {
+      const when = g.state === 'pre' ? `<b>${esc(time(g.start))}</b>${esc(g.broadcast || '')}`
+        : g.state === 'in' ? `<b class="live">${esc(g.detail)}</b>${esc(g.broadcast || '')}` : `<b>${esc(g.detail || 'Final')}</b>`;
+      let actions;
+      if (asking === g.id) {
+        actions = `<div class="ask">Who does the room cheer for?</div>` +
+          ['away', 'home', 'both', 'none'].map((c) => `<button class="act${c === 'home' || c === 'away' ? ' primary' : ''}" data-watch="${esc(g.id)}" data-cheer="${c}">${esc(c === 'none' ? 'Just show it' : c === 'both' ? 'Both' : g[c].name)}</button>`).join('') +
+          `<button class="act" data-cancel="1">Cancel</button>`;
+      } else if (g.watch) {
+        actions = `<span class="tag">Watching · cheering for ${esc(CHEER_WORDS[g.watch](g))}</span>` +
+          `<button class="act" data-ask="${esc(g.id)}" style="margin-left:auto">Change</button><button class="act danger" data-unwatch="${esc(g.id)}">Remove</button>`;
+      } else if (g.state === 'post') {
+        actions = '';
+      } else {
+        actions = `<button class="act primary" data-ask="${esc(g.id)}">Watch this game</button>`;
+      }
+      return `<div class="game${g.watch ? ' watching' : ''}">
+        <div class="row"><div class="teams">${teamRow(g.away, g)}${teamRow(g.home, g)}</div><div class="when">${when}</div></div>
+        ${actions ? `<div class="actions">${actions}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const d = b.dataset;
+    if (d.league) { league = d.league; store.set('gd-league', league); asking = null; renderLeagues(); loadGames(); }
+    else if (d.day) { dayOffset = Number(d.day); asking = null; renderDays(); loadGames(); }
+    else if (b.id === 'prev') { start -= 7; dayOffset = Math.max(start, Math.min(dayOffset, start + 13)); renderDays(); loadGames(); }
+    else if (b.id === 'next') { start += 7; dayOffset = Math.max(start, Math.min(dayOffset, start + 13)); renderDays(); loadGames(); }
+    else if (d.ask) { asking = d.ask; loadGames(); }
+    else if (d.cancel) { asking = null; loadGames(); }
+    else if (d.watch) {
+      b.disabled = true;
+      try { await api(`/api/watch?league=${encodeURIComponent(league)}&date=${ymd(dayOffset)}&id=${encodeURIComponent(d.watch)}&cheer=${d.cheer}`, 'POST'); }
+      catch (err) { $('games').insertAdjacentHTML('afterbegin', `<div class="empty err">Couldn't add it: ${esc(err.message)}</div>`); return; }
+      asking = null; loadWatching(); loadGames();
+    } else if (d.unwatch) {
+      await api(`/api/watch?id=${encodeURIComponent(d.unwatch)}`, 'DELETE');
+      loadWatching(); loadGames();
+    }
+  });
+
+  (async () => {
+    leagues = await api('/api/leagues');
+    if (!leagues.some((l) => l.key === league)) league = leagues[0].key;
+    renderLeagues(); renderDays(); loadWatching(); loadGames();
+  })();
+</script>
+</body>
+</html>

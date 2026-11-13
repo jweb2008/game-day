@@ -25,6 +25,8 @@ bash /opt/game-day/update.sh
 | `/scoreboard.html` | Portrait scoreboard for a TV; `?team=KC` picks a game, otherwise live, then next, then latest final |
 | `/scoreboard.html?side=away` (or `side=home`) | Team screen for one side: that team's colors, floating logo, score, possession, its own stats; same takeovers. Left TCL away, right TCL home |
 | `/projector.html` | Projector logo page: the featured team's logo in team colors, a small score bug (`?bug=0` hides it), same takeovers; landscape |
+| `/calendar.html` | Calendar: pick a league, a day and a game to watch, and who the room cheers for. The game joins the screens 3 hours before start (ahead of your own teams) and leaves 90 minutes after the final |
+| `GET /api/leagues`, `GET /api/calendar?league=nfl&date=20261115`, `GET/POST/DELETE /api/watch` | Calendar data and the watch list (saved in `config.local.json`) |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
 | `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`); Home Assistant's delay slider calls this |

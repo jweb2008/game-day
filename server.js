@@ -7,6 +7,12 @@ const path = require('path');
 const { fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
+const { LEAGUES, league: leagueInfo } = require('./lib/leagues');
+
+// The sport for a league key: your teams' leagues first, then the calendar's catalog.
+function sportOf(lg) {
+  return (config.teams.find((t) => t.league === lg) || leagueInfo(lg) || {}).sport;
+}
 
 const ROOT = __dirname;
 const LOCAL_CONFIG = path.join(ROOT, 'config.local.json'); // per-house settings, never in git
@@ -129,10 +135,76 @@ async function pollOnce() {
       ticker.push(...(live.ticker || []).filter((t) => t.league === lg.league));
     }
   }
-  await addStats(games);
-  live = { at: new Date().toISOString(), games, ticker };
+  // Games picked on the calendar come first, so on game day they win the screens.
+  const watched = await pollWatched();
+  const all = { ...watched, ...games };
+  // A picked game that one of your teams is playing in: the calendar pick wins, so it isn't shown or celebrated twice.
+  const watchedIds = new Set(Object.values(watched).map((g) => g.id));
+  for (const [k, g] of Object.entries(games)) if (watchedIds.has(g.id)) delete all[k];
+  await addStats(all);
+  live = { at: new Date().toISOString(), games: all, ticker };
   buffer.push(live);
 }
+
+// ---- the watch list (games picked on the calendar) ---------------------
+// Each one: { id, league, date: 'YYYYMMDD', start, cheer: 'home'|'away'|'both'|'none', away, home, label }.
+// Its game joins the screens from 3 hours before the start until 90 minutes after the final,
+// under the key G<id> so it never mixes with your own teams.
+
+const finalSeen = new Map(); // id -> when the final was first seen
+
+function watchList() {
+  // Drop games that started more than two days ago.
+  const cutoff = Date.now() - 2 * 24 * 3600 * 1000;
+  const list = (config.watch || []).filter((w) => Date.parse(w.start) > cutoff);
+  if (list.length !== (config.watch || []).length) { config.watch = list; saveLocal({ watch: list }); }
+  return list;
+}
+
+async function pollWatched() {
+  const now = Date.now();
+  const out = {};
+  const boards = new Map();
+  for (const w of watchList()) {
+    const start = Date.parse(w.start);
+    if (now < start - 3 * 3600 * 1000 || now > start + 12 * 3600 * 1000) continue;
+    const lg = leagueInfo(w.league);
+    if (!lg) continue;
+    const key = `${w.league}:${w.date}`;
+    if (!boards.has(key)) {
+      try { boards.set(key, await fetchScoreboard(lg.sport, w.league, { dates: w.date, groups: lg.groups })); }
+      catch (err) { console.error('watch feed error:', err.message); boards.set(key, null); }
+    }
+    const sb = boards.get(key);
+    const ev = sb && (sb.events || []).find((e) => String(e.id) === String(w.id));
+    const game = ev ? normalizeEvent(ev, w.league) : live.games[`G${w.id}`];
+    if (!game) continue;
+    if (game.state === 'post') {
+      if (!finalSeen.has(w.id)) finalSeen.set(w.id, now);
+      if (now - finalSeen.get(w.id) > 90 * 60 * 1000) continue;
+    }
+    game.watch = { cheer: w.cheer };
+    out[`G${w.id}`] = game;
+  }
+  return out;
+}
+
+// Calendar: every game in a league on one day.
+const calendarCache = new Map(); // league:date -> { t, games }
+
+async function calendarDay(lgKey, date) {
+  const lg = leagueInfo(lgKey);
+  if (!lg) throw new Error('unknown league');
+  const key = `${lgKey}:${date}`;
+  const cached = calendarCache.get(key);
+  if (cached && Date.now() - cached.t < 60 * 1000) return cached.games;
+  const sb = await fetchScoreboard(lg.sport, lgKey, { dates: date, groups: lg.groups });
+  const games = (sb.events || []).map((ev) => normalizeEvent(ev, lgKey)).filter((g) => g.home && g.away);
+  calendarCache.set(key, { t: Date.now(), games });
+  return games;
+}
+
+const brief = (t) => (t ? { abbr: t.abbr, name: t.name, fullName: t.fullName, logo: t.logo, color: t.color, record: t.record } : null);
 
 // Box score stats for games that have started. Refreshed every 10s while live, once more at the final.
 const statsCache = new Map(); // eventId -> { t, state, stats }
@@ -149,8 +221,7 @@ async function addStats(games) {
     const fresh = cached && (cached.state === 'post' || Date.now() - cached.t < 10000);
     if (!fresh) {
       try {
-        const lg = config.teams.find((t) => t.league === game.league);
-        const summary = await fetchSummary(lg.sport, game.league, game.id);
+        const summary = await fetchSummary(sportOf(game.league), game.league, game.id);
         statsCache.set(game.id, { t: Date.now(), state: game.state, stats: pickStats(summary, game.league, game.away?.id, game.home?.id) });
       } catch (err) {
         console.error('stats error:', err.message);
@@ -184,7 +255,9 @@ const recentTD = new Map(); // "gameId:abbr" -> time of their last touchdown, to
 
 // What kind of score it was, so the screens know which takeover to run.
 function scoreKind(ev, game) {
-  if (game.league === 'nhl') return 'goal';
+  const scoring = game.league === 'nhl' ? 'goals' : game.league === 'nfl' ? 'football' : (leagueInfo(game.league) || {}).scoring;
+  if (scoring === 'goals') return 'goal';
+  if (scoring !== 'football') return 'point'; // basketball and baseball: no score takeover
   const key = `${game.id}:${ev.team}`;
   if (ev.points >= 6) { recentTD.set(key, Date.now()); return 'touchdown'; }
   if (ev.points === 3) return 'fieldgoal';
@@ -236,7 +309,7 @@ function broadcast(type, data) {
 
 // Follow switches (set from Home Assistant): a team switched off is left off the screens and
 // sends no events. Teams never mentioned are followed.
-const following = (abbr) => !config.follow || config.follow[abbr] !== false;
+const following = (abbr) => abbr.startsWith('G') || !config.follow || config.follow[abbr] !== false;
 // Game picker: which followed team the screens feature; null means automatic.
 const featured = () => (config.featured && following(config.featured) ? config.featured : null);
 
@@ -260,6 +333,27 @@ function screenState() {
 // delay longer (the screens step back in time) never replays a score a second time.
 let eventBase = null;
 
+// Who the room cheers for in a game: your team, or the side(s) you picked on the calendar.
+function cheerTeams(key, game) {
+  if (!key.startsWith('G')) return [key];
+  const c = (game.watch || {}).cheer;
+  return [(c === 'away' || c === 'both') && game.away?.abbr, (c === 'home' || c === 'both') && game.home?.abbr].filter(Boolean);
+}
+
+// Team colors as [r, g, b] for the lights; a near-black first color gives way to the second.
+function rgb(hex) {
+  const n = parseInt(String(hex || '').replace('#', ''), 16);
+  return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : null;
+}
+function teamColors(t) {
+  if (!t) return {};
+  let c1 = rgb(t.color), c2 = rgb(t.altColor);
+  if (c1 && c1[0] + c1[1] + c1[2] < 60 && c2) [c1, c2] = [c2, c1];
+  // A bulb can't show black: it would just switch off. Dark seconds become white.
+  if (!c2 || (c1 && c2.join() === c1.join()) || c2[0] + c2[1] + c2[2] < 60) c2 = [255, 255, 255];
+  return { color_1: c1 || [255, 255, 255], color_2: c2 };
+}
+
 function tick() {
   const next = buffer.at(config.delaySeconds * 1000);
   if (!next || next === shown) return;
@@ -270,6 +364,12 @@ function tick() {
       for (const ev of diffGame(eventBase.games[abbr], game)) {
         const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
         if (ev.type === 'score') event.kind = scoreKind(ev, game);
+        const cheer = cheerTeams(abbr, game);
+        const who = ev.type === 'score' ? ev.team : ev.type === 'final' ? ev.winner : ev.type === 'third' ? ev.offense : cheer[0];
+        event.cheerTeams = cheer;
+        event.cheer = !!who && cheer.includes(who);
+        Object.assign(event, teamColors([game.home, game.away].find((t) => t && t.abbr === (event.cheer ? who : cheer[0])) || game.home));
+        if (abbr.startsWith('G')) event.label = game.name;
         publish(event);
       }
     }
@@ -367,7 +467,8 @@ function takeover(type, team) {
   const at = new Date().toISOString();
   const follow = (team || config.teams[0].abbr).toUpperCase();
   const game = shown && shown.games[follow];
-  const base = { follow, game: game ? game.id : null, league: game ? game.league : null, at, test: true };
+  const us = game && [game.home, game.away].find((t) => t && t.abbr === follow);
+  const base = { follow, game: game ? game.id : null, league: game ? game.league : null, at, test: true, cheerTeams: [follow], cheer: true, ...teamColors(us) };
   if (POINTS[type]) return { ...base, type: 'score', kind: type, team: follow, points: POINTS[type] };
   if (type === 'win') return { ...base, type: 'final', winner: follow };
   if (type === 'third' || type === 'defense') {
@@ -442,6 +543,49 @@ const server = http.createServer((req, res) => {
     saveLocal({ delaySeconds: seconds });
     broadcast('state', screenState());
     return json(res, 200, { delaySeconds: seconds });
+  }
+
+  if (url.pathname === '/api/leagues') return json(res, 200, LEAGUES.map(({ key, name, sport }) => ({ key, name, sport })));
+
+  if (url.pathname === '/api/calendar') {
+    const lg = url.searchParams.get('league');
+    const date = String(url.searchParams.get('date') || '').replace(/-/g, '');
+    if (!leagueInfo(lg) || !/^\d{8}$/.test(date)) return json(res, 400, { error: 'need league and date=YYYYMMDD' });
+    calendarDay(lg, date).then((games) => {
+      const watching = new Map(watchList().map((w) => [String(w.id), w.cheer]));
+      json(res, 200, games.map((g) => ({
+        id: g.id, league: lg, name: g.name, start: g.start, state: g.state, detail: g.detail, broadcast: g.broadcast,
+        away: { ...brief(g.away), score: g.away.score }, home: { ...brief(g.home), score: g.home.score }, watch: watching.get(g.id) || null,
+      })));
+    }).catch((err) => json(res, 502, { error: err.message }));
+    return;
+  }
+
+  if (url.pathname === '/api/watch' && req.method === 'GET') return json(res, 200, watchList());
+
+  if (url.pathname === '/api/watch' && req.method === 'POST') {
+    const lg = url.searchParams.get('league');
+    const date = String(url.searchParams.get('date') || '').replace(/-/g, '');
+    const id = String(url.searchParams.get('id') || '');
+    const cheer = String(url.searchParams.get('cheer') || 'none');
+    if (!['home', 'away', 'both', 'none'].includes(cheer)) return json(res, 400, { error: 'cheer must be home, away, both or none' });
+    if (!leagueInfo(lg) || !/^\d{8}$/.test(date) || !id) return json(res, 400, { error: 'need league, date and id' });
+    calendarDay(lg, date).then((games) => {
+      const g = games.find((x) => x.id === id);
+      if (!g) return json(res, 404, { error: 'game not found on that day' });
+      const entry = { id, league: lg, date, start: g.start, cheer, label: g.name, away: brief(g.away), home: brief(g.home) };
+      config.watch = [...watchList().filter((w) => String(w.id) !== id), entry].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+      saveLocal({ watch: config.watch });
+      json(res, 200, config.watch);
+    }).catch((err) => json(res, 502, { error: err.message }));
+    return;
+  }
+
+  if (url.pathname === '/api/watch' && req.method === 'DELETE') {
+    const id = String(url.searchParams.get('id') || '');
+    config.watch = watchList().filter((w) => String(w.id) !== id);
+    saveLocal({ watch: config.watch });
+    return json(res, 200, config.watch);
   }
 
   if (url.pathname === '/api/follow' && req.method === 'POST') {

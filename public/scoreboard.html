@@ -402,9 +402,16 @@
   // Show times in the house's time zone, whatever the TV is set to.
   const tz = () => (state && state.timeZone) || undefined;
 
+  function startWord(g) {
+    if (g.league === 'nhl' || /hockey/.test(g.league)) return 'puck drop';
+    if (/football|nfl/.test(g.league) || /\./.test(g.league)) return 'kickoff';
+    if (g.league === 'mlb') return 'first pitch';
+    return 'tip-off';
+  }
+
   function periodName(g) {
     const n = g.period;
-    if (g.league === 'nhl') return n > 3 ? (n === 4 ? 'OT' : `${n - 3}OT`) : ['1st', '2nd', '3rd'][n - 1] || '';
+    if (g.league === 'nhl' || /hockey/.test(g.league)) return n > 3 ? (n === 4 ? 'OT' : `${n - 3}OT`) : ['1st', '2nd', '3rd'][n - 1] || '';
     return n > 4 ? 'OT' : ['1st', '2nd', '3rd', '4th'][n - 1] || '';
   }
 
@@ -448,9 +455,19 @@
       </section>`;
   }
 
+  // The team whose colors lead: your team, or in a calendar game the side you cheer for (home if both or neither).
+  function featuredTeam(follow, g) {
+    const c = g.watch && g.watch.cheer;
+    if (c === 'away') return g.away || g.home;
+    if (g.watch) return g.home || g.away;
+    return [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
+  }
+
   function statusBar(g) {
     let when;
-    if (g.state === 'in') {
+    if (g.state === 'in' && !['nfl', 'nhl', 'college-football', 'mens-college-hockey'].includes(g.league)) {
+      when = `<span class="when live">${esc(g.detail)}</span>`; // innings, halves, quarters: ESPN's own words
+    } else if (g.state === 'in') {
       const p = periodName(g);
       const clock = g.clock && g.clock !== '0:00' ? g.clock : '';
       when = /half/i.test(g.detail) || /end of/i.test(g.detail) || /intermission/i.test(g.detail)
@@ -472,7 +489,7 @@
         const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
         const days = Math.floor(h / 24);
         const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        return `<div class="countdown"><div class="big">${big}</div><div class="sub">until ${g.league === 'nhl' ? 'puck drop' : 'kickoff'}</div></div>`;
+        return `<div class="countdown"><div class="big">${big}</div><div class="sub">until ${startWord(g)}</div></div>`;
       }
       return '';
     }
@@ -629,7 +646,7 @@
       if (ms > 0 && ms < 7 * 24 * 3600 * 1000) {
         const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60, days = Math.floor(h / 24);
         const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-        mid = `<div class="sd-countdown"><div class="big">${big}</div><div class="sub">until ${g.league === 'nhl' ? 'puck drop' : 'kickoff'}</div></div>`;
+        mid = `<div class="sd-countdown"><div class="big">${big}</div><div class="sub">until ${startWord(g)}</div></div>`;
       }
     } else if ((g.stats || []).length) {
       // This team's numbers; each bar is measured against the other team's.
@@ -659,7 +676,7 @@
     }
     const [follow, g] = pick;
     featuredId = g.id;
-    const featured = [g.home, g.away].find((t) => t && t.abbr === follow) || g.home;
+    const featured = featuredTeam(follow, g);
     if (logoView) return renderLogo(featured, g);
     if (sideView) return renderSide(g);
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
@@ -708,10 +725,12 @@
     return own ? mediaUrl(own) : t.logo;
   }
 
-  function teamsFor(follow) {
+  // `team` names the side to show when it isn't the follow key itself (a game picked on the calendar).
+  function teamsFor(follow, team) {
     const g = state && state.games && state.games[follow];
-    const us = g && [g.home, g.away].find((t) => t && t.abbr === follow);
-    const them = g && [g.home, g.away].find((t) => t && t.abbr !== follow);
+    const abbr = team || follow;
+    const us = g && [g.home, g.away].find((t) => t && t.abbr === abbr);
+    const them = g && [g.home, g.away].find((t) => t && t.abbr !== abbr);
     return { g, us, them };
   }
 
@@ -804,8 +823,8 @@
 
   function showTakeover(item) {
     const { moment, follow } = item;
-    const { g, us } = teamsFor(follow);
-    const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, follow);
+    const { g, us } = teamsFor(follow, item.team);
+    const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, item.team || follow);
     tkoEl.className = 'tko' + (moment === 'anthem' ? ' anthem' : '') + (found.video ? ' has-video' : '');
     const colors = paint(tkoEl, us);
     let html;
@@ -864,16 +883,16 @@
     showTakeover(item);
   }
 
-  function showBanner(cls, big, sub, follow, moment) {
+  function showBanner(cls, big, sub, follow, moment, team) {
     if (current) return; // a takeover is up; the banner would only hide behind it
     clearTimeout(bannerTimer);
-    const { us } = teamsFor(follow);
+    const { us } = teamsFor(follow, team);
     paint(bannerEl, us);
     bannerEl.className = `banner ${cls}`;
     bannerEl.innerHTML = `<div class="stripes"></div><b>${esc(big)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
     bannerEl.hidden = false;
     let els = [];
-    if (moment) { const found = findMedia(moment, follow); if (found.audio) els = playMedia({ audio: found.audio }); }
+    if (moment) { const found = findMedia(moment, team || follow); if (found.audio) els = playMedia({ audio: found.audio }); }
     bannerTimer = setTimeout(() => {
       fadeOut(els);
       bannerEl.classList.add('out');
@@ -896,16 +915,18 @@
     if (!state || state.buffering) return;
     // Scores and 3rd downs: only for the game this screen is showing (tests always show).
     const mine = ev.test || ev.follow === featuredFollow();
-    if (ev.type === 'score' && ev.team === ev.follow && mine) {
-      if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow);
-      if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow });
+    // Who the room cheers for: your team, or the side(s) picked on the calendar.
+    const cheer = ev.cheerTeams || [ev.follow];
+    if (ev.type === 'score' && cheer.includes(ev.team) && mine) {
+      if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow, null, ev.team);
+      if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow, team: ev.team });
     }
-    if (ev.type === 'third' && mine) {
-      if (ev.offense === ev.follow) return showBanner('third', '3rd down', ev.text, ev.follow);
-      return showBanner('defense', 'Defense', ev.text, ev.follow, 'defense');
+    if (ev.type === 'third' && mine && cheer.length) {
+      if (cheer.includes(ev.offense)) return showBanner('third', '3rd down', ev.text, ev.follow, null, ev.offense);
+      return showBanner('defense', 'Defense', ev.text, ev.follow, 'defense', cheer[0]);
     }
-    // A win: for any team you follow.
-    if (ev.type === 'final' && ev.winner && ev.winner === ev.follow) startTakeover({ moment: 'win', follow: ev.follow });
+    // A win: for any team you follow, and the side you picked in a calendar game.
+    if (ev.type === 'final' && ev.winner && cheer.includes(ev.winner)) startTakeover({ moment: 'win', follow: ev.follow, team: ev.winner });
   }
 
   function connect() {
