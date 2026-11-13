@@ -181,6 +181,30 @@
   .sd-countdown { text-align: center; margin-top: 6vmin; color: #f5f3ee; }
   .sd-countdown .big { font-size: 17vmin; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
   .sd-countdown .sub { font-size: 5.4vmin; color: var(--muted); margin-top: 2vmin; font-weight: 500; }
+
+  /* ---- Leaderboard (golf, racing): the field instead of two teams ---- */
+  #field { display: none; }
+  body.field #top, body.field #rest, body.field #side, body.field #logo-page { display: none !important; }
+  body.field #field { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+  body.field { background: #0c1a14; }
+  body.field.racing { background: #121418; }
+  .fd-head { padding: 4vmin 5vmin 3vmin; border-bottom: .6vmin solid var(--fd-accent, #3fbf7f); }
+  .fd-name { font-size: 9vmin; font-weight: 800; line-height: .95; }
+  .fd-sub { display: flex; justify-content: space-between; gap: 3vmin; margin-top: 1.6vmin; font-size: 5vmin; color: var(--muted); }
+  .fd-sub .live { color: #ff8a8a; font-weight: 700; }
+  .fd-rows { display: flex; flex-direction: column; padding: 1.5vmin 0; }
+  .fd-row { display: grid; grid-template-columns: 9vmin 7vmin 1fr auto auto; align-items: center; gap: 2.4vmin; padding: 1.5vmin 5vmin; font-size: 5.8vmin; font-weight: 700; line-height: 1.15; }
+  .fd-row:nth-child(odd) { background: rgba(255,255,255,.035); }
+  .fd-row .p { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .fd-row img { width: 7vmin; height: 7vmin; object-fit: cover; border-radius: 1vmin; }
+  .fd-row .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fd-row .s { font-variant-numeric: tabular-nums; text-align: right; }
+  .fd-row .t { font-size: 3.8vmin; font-weight: 500; color: var(--muted); text-align: right; white-space: nowrap; }
+  .fd-row.lead .p { color: var(--fd-accent, #3fbf7f); }
+  .fd-row.lead { font-size: 6.4vmin; }
+  body.wide .fd-row { font-size: 5vmin; padding: 1.1vmin 5vmin; }
+  body.wide .fd-head { padding: 3vmin 5vmin 2vmin; }
+  body.wide .fd-name { font-size: 7vmin; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
   body.wide #app { width: 100vw; height: 100vh; }
   #logo-page { display: none; }
@@ -320,6 +344,7 @@
 <body>
 <div id="app">
   <div id="top"><div class="empty">Connecting to Game Day…</div></div>
+  <div id="field"><div class="fd-head"><div class="fd-name"></div><div class="fd-sub"></div></div><div class="fd-rows"></div></div>
   <div id="side">
     <div class="status sd-status"></div>
     <div class="sd-hero"><div class="sd-tag"></div><img class="sd-logo" alt="" hidden onerror="this.hidden=true"><div class="sd-city"></div><div class="sd-name"></div><div class="sd-record"></div></div>
@@ -613,12 +638,14 @@
       document.body.style.setProperty('--sd-band-bright', bright);
       document.body.style.setProperty('--accent', bright);
       const city = t.fullName && t.name && t.fullName.endsWith(t.name) ? t.fullName.slice(0, -t.name.length).trim() : '';
-      sd('.sd-tag').textContent = sideView;
+      sd('.sd-tag').textContent = g.kind === 'match' ? [g.event, g.round].filter(Boolean).join(' · ') || sideView : sideView;
       const logo = logoFor(t);
       sd('.sd-logo').hidden = !logo;
       if (logo) sd('.sd-logo').src = logo;
-      sd('.sd-city').textContent = city;
-      sd('.sd-name').textContent = t.name || t.abbr;
+      // Players and fighters: full name, last name big.
+      const full = t.fullName || t.name || t.abbr;
+      sd('.sd-city').textContent = g.kind === 'match' ? full.split(' ').slice(0, -1).join(' ') : city;
+      sd('.sd-name').textContent = g.kind === 'match' ? full.split(' ').slice(-1)[0] : (t.name || t.abbr);
     }
     sd('.sd-record').textContent = t.record || '';
     sd('.sd-status').innerHTML = statusBar(g).replace(/^<header class="status">|<\/header>$/g, '');
@@ -648,6 +675,13 @@
         const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
         mid = `<div class="sd-countdown"><div class="big">${big}</div><div class="sub">until ${startWord(g)}</div></div>`;
       }
+    } else if (g.kind === 'match' && (t.periods || []).length) {
+      // Tennis: games won in each set, each bar against the other player's.
+      mid = '<div class="sd-stats">' + t.periods.map((v, i) => {
+        const o = (opp && opp.periods && opp.periods[i]) || 0;
+        const max = Math.max(v, o) || 1;
+        return `<div class="sd-stat"><span class="l">Set ${i + 1}</span><span class="v">${v}</span><div class="bar"><i style="width:${Math.round((v / max) * 100)}%"></i></div></div>`;
+      }).join('') + '</div>';
     } else if ((g.stats || []).length) {
       // This team's numbers; each bar is measured against the other team's.
       mid = '<div class="sd-stats">' + g.stats.slice(0, 6).map((r) => {
@@ -660,6 +694,30 @@
     sd('.sd-mid').innerHTML = mid;
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
+  }
+
+  // Leaderboard: left TV (side=away) shows places 1-10, right TV (side=home) 11-20,
+  // the combined scoreboard 1-12 and the projector the top 8.
+  const fdEl = document.getElementById('field');
+  function renderField(g) {
+    document.body.classList.toggle('racing', /nascar|irl|f1/.test(g.league));
+    fdEl.style.setProperty('--fd-accent', /nascar|irl|f1/.test(g.league) ? '#e5484d' : '#3fbf7f');
+    const [from, count] = sideView === 'home' ? [10, 10] : sideView === 'away' ? [0, 10] : logoView ? [0, 8] : [0, 12];
+    fdEl.querySelector('.fd-name').textContent = g.shortName || g.name;
+    const when = g.state === 'in' ? `<span class="live">${esc(g.detail)}</span>` : g.state === 'post' ? esc(g.detail || 'Final')
+      : esc(new Date(g.start).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: tz() }));
+    fdEl.querySelector('.fd-sub').innerHTML = `<span>${when}</span><span>${esc(sideView === 'home' ? 'Places 11-20' : g.broadcast || '')}</span>`;
+    const rows = (g.leaders || []).slice(from, from + count);
+    fdEl.querySelector('.fd-rows').innerHTML = rows.length ? rows.map((l, i) => `
+      <div class="fd-row${from + i === 0 ? ' lead' : ''}">
+        <span class="p">${esc(l.pos)}</span>
+        ${l.pic ? `<img src="${esc(l.pic)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
+        <span class="n">${esc(l.short || l.name)}</span>
+        <span class="t">${esc(l.note)}</span>
+        <span class="s">${esc(l.score)}</span>
+      </div>`).join('') : `<div class="empty">${g.state === 'pre' ? 'The field shows here once it starts.' : 'No standings yet.'}</div>`;
+    setPlay('');
+    if (!logoView && !tickerRunning) runTicker();
   }
 
   function render() {
@@ -676,6 +734,8 @@
     }
     const [follow, g] = pick;
     featuredId = g.id;
+    document.body.classList.toggle('field', g.kind === 'field');
+    if (g.kind === 'field') return renderField(g);
     const featured = featuredTeam(follow, g);
     if (logoView) return renderLogo(featured, g);
     if (sideView) return renderSide(g);

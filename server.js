@@ -4,10 +4,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
+const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
-const { LEAGUES, league: leagueInfo } = require('./lib/leagues');
+const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
 function sportOf(lg) {
@@ -153,10 +153,22 @@ async function pollOnce() {
 
 const finalSeen = new Map(); // id -> when the final was first seen
 
+// Every game on a scoreboard, in the shape its kind of league needs.
+function gamesFromBoard(sb, lgKey) {
+  const kind = (leagueInfo(lgKey) || {}).kind || 'team';
+  const events = sb.events || [];
+  if (kind === 'field') return events.map((ev) => normalizeField(ev, lgKey));
+  if (kind === 'match') return events.flatMap((ev) => matchesOf(ev, lgKey));
+  return events.map((ev) => normalizeEvent(ev, lgKey)).filter((g) => g.home && g.away);
+}
+
+// When a pick is over: its end (golf and racing run for days), else 12 hours after the start.
+const watchEnd = (w) => (w.end ? Date.parse(w.end) + 12 * 3600 * 1000 : Date.parse(w.start) + 12 * 3600 * 1000);
+
 function watchList() {
-  // Drop games that started more than two days ago.
+  // Drop picks that ended more than two days ago.
   const cutoff = Date.now() - 2 * 24 * 3600 * 1000;
-  const list = (config.watch || []).filter((w) => Date.parse(w.start) > cutoff);
+  const list = (config.watch || []).filter((w) => watchEnd(w) > cutoff);
   if (list.length !== (config.watch || []).length) { config.watch = list; saveLocal({ watch: list }); }
   return list;
 }
@@ -167,17 +179,18 @@ async function pollWatched() {
   const boards = new Map();
   for (const w of watchList()) {
     const start = Date.parse(w.start);
-    if (now < start - 3 * 3600 * 1000 || now > start + 12 * 3600 * 1000) continue;
+    if (now < start - 3 * 3600 * 1000 || now > watchEnd(w)) continue;
     const lg = leagueInfo(w.league);
     if (!lg) continue;
-    const key = `${w.league}:${w.date}`;
+    // Golf and racing run for days: read today's board for them, not the day they were picked.
+    const dates = lg.kind === 'field' ? null : w.date;
+    const key = `${w.league}:${dates || 'now'}`;
     if (!boards.has(key)) {
-      try { boards.set(key, await fetchScoreboard(lg.sport, w.league, { dates: w.date, groups: lg.groups })); }
+      try { boards.set(key, gamesFromBoard(await fetchScoreboard(lg.sport, w.league, { dates, groups: lg.groups }), w.league)); }
       catch (err) { console.error('watch feed error:', err.message); boards.set(key, null); }
     }
-    const sb = boards.get(key);
-    const ev = sb && (sb.events || []).find((e) => String(e.id) === String(w.id));
-    const game = ev ? normalizeEvent(ev, w.league) : live.games[`G${w.id}`];
+    const found = (boards.get(key) || []).find((g) => String(g.id) === String(w.id));
+    const game = found || live.games[`G${w.id}`];
     if (!game) continue;
     if (game.state === 'post') {
       if (!finalSeen.has(w.id)) finalSeen.set(w.id, now);
@@ -198,8 +211,7 @@ async function calendarDay(lgKey, date) {
   const key = `${lgKey}:${date}`;
   const cached = calendarCache.get(key);
   if (cached && Date.now() - cached.t < 60 * 1000) return cached.games;
-  const sb = await fetchScoreboard(lg.sport, lgKey, { dates: date, groups: lg.groups });
-  const games = (sb.events || []).map((ev) => normalizeEvent(ev, lgKey)).filter((g) => g.home && g.away);
+  const games = gamesFromBoard(await fetchScoreboard(lg.sport, lgKey, { dates: date, groups: lg.groups }), lgKey);
   calendarCache.set(key, { t: Date.now(), games });
   return games;
 }
@@ -212,6 +224,7 @@ const statsCache = new Map(); // eventId -> { t, state, stats }
 async function addStats(games) {
   const seen = new Set();
   for (const game of Object.values(games)) {
+    if (game.kind === 'field' || game.kind === 'match') continue; // no box score to show
     if (game.state === 'pre' || seen.has(game.id)) {
       if (game.state !== 'pre') game.stats = statsCache.get(game.id)?.stats || [];
       continue;
@@ -545,7 +558,7 @@ const server = http.createServer((req, res) => {
     return json(res, 200, { delaySeconds: seconds });
   }
 
-  if (url.pathname === '/api/leagues') return json(res, 200, LEAGUES.map(({ key, name, sport }) => ({ key, name, sport })));
+  if (url.pathname === '/api/leagues') return json(res, 200, { sports: SPORTS.map(([key, name]) => ({ key, name })), leagues: LEAGUES.map(({ key, name, sport, kind }) => ({ key, name, sport, kind })) });
 
   if (url.pathname === '/api/calendar') {
     const lg = url.searchParams.get('league');
@@ -553,8 +566,12 @@ const server = http.createServer((req, res) => {
     if (!leagueInfo(lg) || !/^\d{8}$/.test(date)) return json(res, 400, { error: 'need league and date=YYYYMMDD' });
     calendarDay(lg, date).then((games) => {
       const watching = new Map(watchList().map((w) => [String(w.id), w.cheer]));
-      json(res, 200, games.map((g) => ({
-        id: g.id, league: lg, name: g.name, start: g.start, state: g.state, detail: g.detail, broadcast: g.broadcast,
+      json(res, 200, games.map((g) => (g.kind === 'field' ? {
+        id: g.id, league: lg, kind: 'field', name: g.name, start: g.start, end: g.end, state: g.state, detail: g.detail, broadcast: g.broadcast,
+        leaders: g.state === 'pre' ? [] : g.leaders.slice(0, 3), watch: watching.get(g.id) || null,
+      } : {
+        id: g.id, league: lg, kind: g.kind || 'team', name: g.name, event: g.event, round: g.round, start: g.start, state: g.state,
+        detail: g.sets ? `${g.detail} · ${g.sets}` : g.detail, broadcast: g.broadcast,
         away: { ...brief(g.away), score: g.away.score }, home: { ...brief(g.home), score: g.home.score }, watch: watching.get(g.id) || null,
       })));
     }).catch((err) => json(res, 502, { error: err.message }));
@@ -573,7 +590,9 @@ const server = http.createServer((req, res) => {
     calendarDay(lg, date).then((games) => {
       const g = games.find((x) => x.id === id);
       if (!g) return json(res, 404, { error: 'game not found on that day' });
-      const entry = { id, league: lg, date, start: g.start, cheer, label: g.name, away: brief(g.away), home: brief(g.home) };
+      const entry = g.kind === 'field'
+        ? { id, league: lg, date, kind: 'field', start: g.start, end: g.end, cheer: 'none', label: g.name }
+        : { id, league: lg, date, kind: g.kind || 'team', start: g.start, cheer, label: g.event ? `${g.event}: ${g.away.fullName || g.away.name} vs ${g.home.fullName || g.home.name}` : g.name, away: brief(g.away), home: brief(g.home) };
       config.watch = [...watchList().filter((w) => String(w.id) !== id), entry].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
       saveLocal({ watch: config.watch });
       json(res, 200, config.watch);

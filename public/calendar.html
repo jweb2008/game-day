@@ -44,6 +44,12 @@
   .ask { color: var(--muted); font-size: 14px; width: 100%; }
   .tag { font-size: 13px; color: var(--good); font-weight: 600; }
   .empty { color: var(--muted); padding: 14px 2px; }
+  .chip.small { font-size: 13px; padding: 6px 12px; }
+  .evname { font-weight: 700; font-size: 16px; }
+  .round { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .lead { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }
+  .lead b { color: var(--text); min-width: 22px; }
+  .lead .s { margin-left: auto; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
   .err { color: var(--bad); }
 </style>
 </head>
@@ -56,7 +62,8 @@
   <div class="list" id="watching"></div>
 
   <h2>Find a game</h2>
-  <div class="chips" id="leagues"></div>
+  <div class="chips" id="sports"></div>
+  <div class="chips" id="leagues" style="margin-top:8px"></div>
   <div class="nav" style="margin-top:10px">
     <button class="arrow" id="prev" aria-label="Earlier days">‹</button>
     <div class="chips" id="days"></div>
@@ -74,7 +81,9 @@
   // Remember the last league picked on this device.
   const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
   let leagues = [];
+  let sports = [];
   let league = store.get('gd-league') || 'nfl';
+  let sport = null;
   let start = 0;          // first day shown, in days from today
   let dayOffset = 0;      // the day picked
   let asking = null;      // game id with the cheer question open
@@ -107,18 +116,22 @@
     $('watching').innerHTML = list.length ? list.map((w) => `
       <div class="game watching">
         <div class="row">
-          <div class="teams">${teamRow(w.away)}${teamRow(w.home)}</div>
+          <div class="teams">${w.kind === 'field' || !w.away ? `<div class="evname">${esc(w.label)}</div>` : teamRow(w.away) + teamRow(w.home)}</div>
           <div class="when"><b>${esc(dateTime(w.start))}</b>${esc((leagues.find((l) => l.key === w.league) || {}).name || w.league)}</div>
         </div>
         <div class="actions">
-          <span class="tag">Cheering for ${esc(CHEER_WORDS[w.cheer]({ home: w.home, away: w.away }))}</span>
+          <span class="tag">${w.kind === 'field' ? 'Leaderboard on the screens' : `Cheering for ${esc(CHEER_WORDS[w.cheer]({ home: w.home, away: w.away }))}`}</span>
           <button class="act danger" data-unwatch="${esc(w.id)}" style="margin-left:auto">Remove</button>
         </div>
       </div>`).join('') : '<div class="empty">No games picked yet. Find one below.</div>';
   }
 
   function renderLeagues() {
-    $('leagues').innerHTML = leagues.map((l) => `<button class="chip${l.key === league ? ' on' : ''}" data-league="${l.key}">${esc(l.name)}</button>`).join('');
+    sport = (leagues.find((l) => l.key === league) || leagues[0]).sport;
+    $('sports').innerHTML = sports.filter((sp) => leagues.some((l) => l.sport === sp.key))
+      .map((sp) => `<button class="chip${sp.key === sport ? ' on' : ''}" data-sport="${sp.key}">${esc(sp.name)}</button>`).join('');
+    $('leagues').innerHTML = leagues.filter((l) => l.sport === sport)
+      .map((l) => `<button class="chip small${l.key === league ? ' on' : ''}" data-league="${l.key}">${esc(l.name)}</button>`).join('');
   }
 
   function renderDays() {
@@ -141,6 +154,7 @@
     catch (err) { $('games').innerHTML = `<div class="empty err">Couldn't load games: ${esc(err.message)}</div>`; return; }
     if (!games.length) { $('games').innerHTML = '<div class="empty">No games that day.</div>'; return; }
     $('games').innerHTML = games.map((g) => {
+      if (g.kind === 'field') return fieldCard(g);
       const when = g.state === 'pre' ? `<b>${esc(time(g.start))}</b>${esc(g.broadcast || '')}`
         : g.state === 'in' ? `<b class="live">${esc(g.detail)}</b>${esc(g.broadcast || '')}` : `<b>${esc(g.detail || 'Final')}</b>`;
       let actions;
@@ -154,20 +168,35 @@
       } else if (g.state === 'post') {
         actions = '';
       } else {
-        actions = `<button class="act primary" data-ask="${esc(g.id)}">Watch this game</button>`;
+        actions = `<button class="act primary" data-ask="${esc(g.id)}">Watch this ${g.kind === 'match' ? (g.league === 'ufc' ? 'fight' : 'match') : 'game'}</button>`;
       }
-      return `<div class="game${g.watch ? ' watching' : ''}">
+      const head = g.kind === 'match' && (g.event || g.round) ? `<div class="round">${esc([g.event, g.round].filter(Boolean).join(' · '))}</div>` : '';
+      return `<div class="game${g.watch ? ' watching' : ''}">${head}
         <div class="row"><div class="teams">${teamRow(g.away, g)}${teamRow(g.home, g)}</div><div class="when">${when}</div></div>
         ${actions ? `<div class="actions">${actions}</div>` : ''}
       </div>`;
     }).join('');
   }
 
+  // Golf and racing: one card per event, with the leaders once it's under way. No sides to cheer for.
+  function fieldCard(g) {
+    const when = g.state === 'pre' ? `<b>${esc(time(g.start))}</b>${esc(g.broadcast || '')}`
+      : g.state === 'in' ? `<b class="live">${esc(g.detail)}</b>${esc(g.broadcast || '')}` : `<b>${esc(g.detail || 'Final')}</b>`;
+    const leads = (g.leaders || []).map((l) => `<div class="lead"><b>${l.pos}</b>${esc(l.name)}<span class="s">${esc(l.score)}</span></div>`).join('');
+    const actions = g.watch
+      ? `<span class="tag">Watching · leaderboard on the screens</span><button class="act danger" data-unwatch="${esc(g.id)}" style="margin-left:auto">Remove</button>`
+      : g.state === 'post' ? '' : `<button class="act primary" data-watch="${esc(g.id)}" data-cheer="none">Watch this event</button>`;
+    return `<div class="game${g.watch ? ' watching' : ''}">
+      <div class="row"><div class="teams"><div class="evname">${esc(g.name)}</div>${leads}</div><div class="when">${when}</div></div>
+      ${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
+  }
+
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     const d = b.dataset;
-    if (d.league) { league = d.league; store.set('gd-league', league); asking = null; renderLeagues(); loadGames(); }
+    if (d.sport) { const first = leagues.find((l) => l.sport === d.sport); if (first) { league = first.key; store.set('gd-league', league); asking = null; renderLeagues(); loadGames(); } }
+    else if (d.league) { league = d.league; store.set('gd-league', league); asking = null; renderLeagues(); loadGames(); }
     else if (d.day) { dayOffset = Number(d.day); asking = null; renderDays(); loadGames(); }
     else if (b.id === 'prev') { start -= 7; dayOffset = Math.max(start, Math.min(dayOffset, start + 13)); renderDays(); loadGames(); }
     else if (b.id === 'next') { start += 7; dayOffset = Math.max(start, Math.min(dayOffset, start + 13)); renderDays(); loadGames(); }
@@ -185,7 +214,7 @@
   });
 
   (async () => {
-    leagues = await api('/api/leagues');
+    ({ sports, leagues } = await api('/api/leagues'));
     if (!leagues.some((l) => l.key === league)) league = leagues[0].key;
     renderLeagues(); renderDays(); loadWatching(); loadGames();
   })();
