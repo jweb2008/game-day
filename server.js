@@ -7,6 +7,7 @@ const path = require('path');
 const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
+const { pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -218,33 +219,61 @@ async function calendarDay(lgKey, date) {
 
 const brief = (t) => (t ? { abbr: t.abbr, name: t.name, fullName: t.fullName, logo: t.logo, color: t.color, record: t.record } : null);
 
-// Box score stats for games that have started. Refreshed every 10s while live, once more at the final.
-const statsCache = new Map(); // eventId -> { t, state, stats }
+// From ESPN's game summary: box score stats (live), recent form and players to watch (pregame),
+// drives and headshots (live football). Live games refresh every 10s, pregame within 36 hours every
+// 10 minutes, a final once.
+const summaryCache = new Map(); // eventId -> { t, state, extra, raw }
+const HEADSHOT_PATH = { nfl: 'nfl', nhl: 'nhl', nba: 'nba', mlb: 'mlb', wnba: 'wnba', 'college-football': 'college-football', 'mens-college-basketball': 'mens-college-basketball' };
+
+function summaryDue(game, cached) {
+  if (!cached) return true;
+  if (cached.state === 'post' && game.state === 'post') return false;
+  const age = Date.now() - cached.t;
+  if (game.state === 'in') return age > 10000;
+  if (game.state === 'post') return true; // the final, once
+  return age > 10 * 60 * 1000;
+}
+
+function readSummary(summary, game) {
+  const sportPath = HEADSHOT_PATH[game.league] || null;
+  const people = pickPeople(summary, sportPath);
+  return {
+    stats: pickStats(summary, game.league, game.away?.id, game.home?.id),
+    form: pickForm(summary),
+    leaders: pickLeaders(summary, sportPath),
+    drives: /football|nfl|cfl|ufl/.test(game.league) ? pickDrives(summary, people) : null,
+  };
+}
 
 async function addStats(games) {
   const seen = new Set();
   for (const game of Object.values(games)) {
     if (game.kind === 'field' || game.kind === 'match') continue; // no box score to show
-    if (game.state === 'pre' || seen.has(game.id)) {
-      if (game.state !== 'pre') game.stats = statsCache.get(game.id)?.stats || [];
-      continue;
-    }
-    seen.add(game.id);
-    const cached = statsCache.get(game.id);
-    const fresh = cached && (cached.state === 'post' || Date.now() - cached.t < 10000);
-    if (!fresh) {
-      try {
-        const summary = await fetchSummary(sportOf(game.league), game.league, game.id);
-        statsCache.set(game.id, { t: Date.now(), state: game.state, stats: pickStats(summary, game.league, game.away?.id, game.home?.id) });
-      } catch (err) {
-        console.error('stats error:', err.message);
+    const soon = game.state !== 'pre' || (game.start && Date.parse(game.start) - Date.now() < 36 * 3600 * 1000);
+    if (!soon) continue;
+    if (!seen.has(game.id)) {
+      seen.add(game.id);
+      const cached = summaryCache.get(game.id);
+      if (summaryDue(game, cached)) {
+        try {
+          const raw = await fetchSummary(sportOf(game.league), game.league, game.id);
+          summaryCache.set(game.id, { t: Date.now(), state: game.state, extra: readSummary(raw, game), raw });
+        } catch (err) {
+          console.error('summary error:', err.message);
+          if (cached) cached.t = Date.now(); // don't hammer ESPN while it's failing
+        }
       }
     }
-    game.stats = statsCache.get(game.id)?.stats || [];
+    const extra = summaryCache.get(game.id)?.extra;
+    if (!extra) continue;
+    game.stats = game.state === 'pre' ? [] : extra.stats;
+    if (game.state === 'pre') { game.form = extra.form; game.leaders = extra.leaders; }
+    if (game.state === 'in' && extra.drives) game.drives = extra.drives;
+    if (game.state === 'post' && extra.drives) game.drives = { lastScore: extra.drives.lastScore };
   }
   // Forget games that have dropped off the board.
   const current = new Set(Object.values(games).map((g) => g.id));
-  for (const id of statsCache.keys()) if (!current.has(id)) statsCache.delete(id);
+  for (const id of summaryCache.keys()) if (!current.has(id)) summaryCache.delete(id);
 }
 
 function busy() {
@@ -533,6 +562,13 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/state') return json(res, 200, screenState());
+
+  // For troubleshooting: the raw ESPN summary behind a game, e.g. /api/debug/summary?game=401772938
+  if (url.pathname === '/api/debug/summary') {
+    const c = summaryCache.get(String(url.searchParams.get('game') || ''));
+    if (!c) return json(res, 404, { error: 'no summary for that game yet', games: [...summaryCache.keys()] });
+    return json(res, 200, url.searchParams.get('raw') ? c.raw : { at: new Date(c.t).toISOString(), state: c.state, read: c.extra, topKeys: Object.keys(c.raw || {}) });
+  }
 
   if (url.pathname === '/api/status') {
     return json(res, 200, {

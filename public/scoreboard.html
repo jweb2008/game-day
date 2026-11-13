@@ -205,6 +205,53 @@
   body.wide .fd-row { font-size: 5vmin; padding: 1.1vmin 5vmin; }
   body.wide .fd-head { padding: 3vmin 5vmin 2vmin; }
   body.wide .fd-name { font-size: 7vmin; }
+
+  /* ---- Pregame: recent form and players to watch ---- */
+  .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
+  .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .pg-form { display: grid; grid-template-columns: 14vmin 1fr auto; align-items: center; gap: 2.5vmin; }
+  .pg-form .who { font-size: 5.4vmin; font-weight: 800; }
+  .pg-chips { display: flex; gap: 1.4vmin; }
+  .pg-chip { width: 10vmin; padding: .9vmin 0 .7vmin; border-radius: 1.2vmin; text-align: center; background: rgba(255,255,255,.08); line-height: 1; }
+  .pg-chip b { display: block; font-size: 5vmin; }
+  .pg-chip small { display: block; font-size: 2.9vmin; font-weight: 500; color: var(--muted); margin-top: .6vmin; }
+  .pg-chip.W b { color: #5ad19a; } .pg-chip.L b { color: #ff7b7b; }
+  .pg-avg { font-size: 3vmin; color: var(--muted); text-align: right; line-height: 1.15; white-space: nowrap; }
+  .pg-avg b { color: #f5f3ee; font-size: 4.4vmin; }
+  .pg-player { display: grid; grid-template-columns: 12vmin 1fr auto; align-items: center; gap: 3vmin; }
+  .pg-player img, .pg-player .ph { width: 12vmin; height: 12vmin; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.08); }
+  .pg-player .nm { font-size: 5.2vmin; font-weight: 800; line-height: 1.05; }
+  .pg-player .nm small { display: block; font-size: 3.6vmin; font-weight: 500; color: var(--muted); }
+  .pg-player .val { font-size: 4.2vmin; font-weight: 700; text-align: right; max-width: 34vmin; line-height: 1.15; }
+  .countdown.slim { margin-top: 2.5vmin; } .countdown.slim .big { font-size: 11vmin; } .countdown.slim .sub { margin-top: .6vmin; font-size: 4.6vmin; }
+  .sd-countdown.slim { margin-top: 2vmin; } .sd-countdown.slim .big { font-size: 12vmin; } .sd-countdown.slim .sub { margin-top: 1vmin; }
+
+  /* ---- Field view (?view=field): live drive on a football field, for a wide screen ---- */
+  #gridiron { display: none; }
+  body.gridiron #app { width: 100vw; height: 100vh; }
+  body.gridiron #top, body.gridiron #rest, body.gridiron #side, body.gridiron #play, body.gridiron #ticker, body.gridiron #logo-page { display: none !important; }
+  body.gridiron #gridiron { display: flex; flex-direction: column; position: absolute; inset: 0; background: #0a0f0c; }
+  .gi-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 2.4vmin 4vmin; gap: 3vmin; background: rgba(0,0,0,.35); }
+  .gi-team { display: flex; align-items: center; gap: 2.4vmin; font-weight: 800; font-size: 6vmin; }
+  .gi-team.home { justify-content: flex-end; }
+  .gi-team img { width: 9vmin; height: 9vmin; object-fit: contain; }
+  .gi-team .sc { font-size: 9vmin; font-variant-numeric: tabular-nums; min-width: 1.3em; text-align: center; }
+  .gi-team .poss { width: 2.4vmin; height: 2.4vmin; border-radius: 50%; background: #f5f3ee; visibility: hidden; }
+  .gi-team.ball .poss { visibility: visible; }
+  .gi-mid { text-align: center; line-height: 1.05; }
+  .gi-mid .clock { font-size: 5.4vmin; font-weight: 800; }
+  .gi-mid .dd { font-size: 4.4vmin; font-weight: 700; color: #ffd166; margin-top: .8vmin; }
+  .gi-field { position: relative; flex: 1; margin: 2vmin 3vmin 0; min-height: 0; }
+  .gi-field svg { width: 100%; height: 100%; display: block; }
+  .gi-label { position: absolute; left: 4vmin; top: 3vmin; font-size: 3.6vmin; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; padding: .8vmin 2vmin; border-radius: 1vmin; background: rgba(0,0,0,.55); }
+  .gi-label.score { background: #ffd166; color: #111; }
+  .gi-play { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 3vmin; padding: 2.4vmin 4vmin 3vmin; min-height: 18vmin; }
+  .gi-faces { display: flex; gap: 1.6vmin; }
+  .gi-face { text-align: center; width: 15vmin; }
+  .gi-face img, .gi-face .ph { width: 13vmin; height: 13vmin; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.08); display: block; margin: 0 auto; }
+  .gi-face span { display: block; font-size: 2.8vmin; font-weight: 600; color: var(--muted); margin-top: .6vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gi-text { font-size: 4.2vmin; font-weight: 600; line-height: 1.25; color: #f5f3ee; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .gi-text small { display: block; font-size: 3.4vmin; color: var(--muted); font-weight: 500; margin-bottom: .6vmin; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
   body.wide #app { width: 100vw; height: 100vh; }
   #logo-page { display: none; }
@@ -344,6 +391,7 @@
 <body>
 <div id="app">
   <div id="top"><div class="empty">Connecting to Game Day…</div></div>
+  <div id="gridiron"><div class="gi-bar"></div><div class="gi-field"></div><div class="gi-play"></div></div>
   <div id="field"><div class="fd-head"><div class="fd-name"></div><div class="fd-sub"></div></div><div class="fd-rows"></div></div>
   <div id="side">
     <div class="status sd-status"></div>
@@ -370,13 +418,14 @@
   // ?turn=right or ?turn=left for a sideways-hung TV; ?turn=none to never turn.
   // With no setting, a landscape window is turned right automatically.
   // ?view=logo: the projector page, a big team logo in team colors, landscape.
-  const logoView = (params.get('view') || '').toLowerCase() === 'logo';
+  const fieldView = (params.get('view') || '').toLowerCase() === 'field';
+  const logoView = (params.get('view') || '').toLowerCase() === 'logo' || fieldView; // field view falls back to the logo page
   // ?side=away (left TV) or ?side=home (right TV): one team per screen.
   const sideView = ['home', 'away'].includes((params.get('side') || '').toLowerCase()) ? params.get('side').toLowerCase() : null;
   document.body.classList.toggle('side', !!sideView);
   document.body.classList.toggle('wide', logoView);
   function applyTurn() {
-    const turn = (params.get('turn') || (logoView ? 'none' : '')).toLowerCase();
+    const turn = (params.get('turn') || (logoView ? 'none' : '')).toLowerCase(); // logoView includes the field view
     const landscape = window.innerWidth > window.innerHeight;
     document.body.classList.toggle('turn-right', turn === 'right' || (!turn && landscape));
     document.body.classList.toggle('turn-left', turn === 'left');
@@ -507,16 +556,61 @@
     return `<header class="status">${when}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
   }
 
+  // ---- Pregame panels ----
+  function countdownText(g) {
+    const ms = Date.parse(g.start) - Date.now();
+    if (!(ms > 0 && ms < 7 * 24 * 3600 * 1000)) return null;
+    const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60, days = Math.floor(h / 24);
+    return days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  // Last five: a W/L chip per game (with the score under it) and points for/against per game.
+  function formRow(t, list) {
+    if (!t || !list || !list.length) return '';
+    const done = list.filter((x) => x.us != null && x.them != null);
+    const avg = (k) => (done.length ? (done.reduce((a, x) => a + x[k], 0) / done.length).toFixed(1).replace(/\.0$/, '') : '');
+    return `<div class="pg-form"><span class="who">${esc(t.abbr)}</span><span class="pg-chips">` +
+      list.map((x) => `<span class="pg-chip ${esc(x.result)}"><b>${esc(x.result || '·')}</b><small>${x.us != null ? `${x.us}-${x.them}` : esc(x.opp)}</small></span>`).join('') +
+      `</span>${done.length ? `<span class="pg-avg"><b>${avg('us')}-${avg('them')}</b><br>avg score</span>` : '<span></span>'}</div>`;
+  }
+
+  function playerRow(p) {
+    const pic = p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">` : '<span class="ph"></span>';
+    return `<div class="pg-player">${pic}<span class="nm">${esc(p.short || p.name)}<small>${esc([p.pos, p.label].filter(Boolean).join(' · '))}</small></span><span class="val">${esc(p.value)}</span></div>`;
+  }
+
+  // Combined scoreboard: both teams' form, and the top player for each.
+  function pregameBoth(g) {
+    const form = g.form || {}, lead = g.leaders || {};
+    const rows = [formRow(g.away, form[g.away?.abbr]), formRow(g.home, form[g.home?.abbr])].filter(Boolean).join('');
+    const players = [g.away, g.home].map((t) => t && (lead[t.abbr] || [])[0] && playerRow({ ...(lead[t.abbr] || [])[0], pos: t.abbr })).filter(Boolean).join('');
+    if (!rows && !players) return '';
+    return `<div class="pg">${rows ? `<h4>Last 5</h4>${rows}` : ''}${players ? `<h4>Players to watch</h4>${players}` : ''}</div>`;
+  }
+
+  // Team screen: this team's form and its three leaders.
+  function pregameOne(g, t) {
+    const list = (g.form || {})[t.abbr];
+    const players = ((g.leaders || {})[t.abbr] || []).map(playerRow).join('');
+    const form = formRow(t, list);
+    if (!form && !players) return '';
+    return `<div class="pg">${form ? `<h4>Last 5</h4>${form}` : ''}${players ? `<h4>Players to watch</h4>${players}` : ''}</div>`;
+  }
+
+  // Re-render the pregame panels only when their data changes; between changes just tick the clock,
+  // so headshots don't reload every second.
+  function setWithCountdown(el, html, g) {
+    const cd = countdownText(g);
+    if (el._tpl === html) { const b = el.querySelector('.cd-big'); if (b && cd) b.textContent = cd; return; }
+    el._tpl = html;
+    el.innerHTML = html.replace('{CD}', esc(cd || ''));
+  }
+
   function middle(g) {
     if (g.state === 'pre') {
-      const ms = Date.parse(g.start) - Date.now();
-      if (ms > 0 && ms < 7 * 24 * 3600 * 1000) {
-        const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
-        const days = Math.floor(h / 24);
-        const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        return `<div class="countdown"><div class="big">${big}</div><div class="sub">until ${startWord(g)}</div></div>`;
-      }
-      return '';
+      const pg = pregameBoth(g);
+      const cd = countdownText(g) ? `<div class="countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '';
+      return cd + pg;
     }
     let html = '';
     html += statBars(g);
@@ -669,12 +763,8 @@
     sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
     let mid = '';
     if (g.state === 'pre') {
-      const ms = Date.parse(g.start) - Date.now();
-      if (ms > 0 && ms < 7 * 24 * 3600 * 1000) {
-        const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60, days = Math.floor(h / 24);
-        const big = days >= 1 ? `${days}d ${h % 24}h` : `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-        mid = `<div class="sd-countdown"><div class="big">${big}</div><div class="sub">until ${startWord(g)}</div></div>`;
-      }
+      const pg = pregameOne(g, t);
+      mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
       mid = '<div class="sd-stats">' + t.periods.map((v, i) => {
@@ -691,7 +781,7 @@
           `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
     }
-    sd('.sd-mid').innerHTML = mid;
+    setWithCountdown(sd('.sd-mid'), mid, g);
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }
@@ -720,6 +810,85 @@
     if (!logoView && !tickerRunning) runTicker();
   }
 
+  // ---- Field view -------------------------------------------------------
+  // The offense always drives left to right: their end zone on the left, the one they're attacking on
+  // the right. Each play of the drive is a bar from where it started to where it ended, stacked
+  // top to bottom; gains in team color, losses in red, the scoring play in gold.
+  const giEl = document.getElementById('gridiron');
+  let scoreDriveUntil = 0; // after a touchdown or field goal, show the scoring drive for a minute
+
+  function giTeam(t, side, g) {
+    if (!t) return '';
+    const ball = g.state === 'in' && g.possession === t.id;
+    const pic = logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '';
+    const inner = side === 'away' ? `${pic}<span>${esc(t.abbr)}</span><span class="sc">${t.score}</span><span class="poss"></span>`
+      : `<span class="poss"></span><span class="sc">${t.score}</span><span>${esc(t.abbr)}</span>${pic}`;
+    return `<div class="gi-team ${side}${ball ? ' ball' : ''}">${inner}</div>`;
+  }
+
+  function fieldSVG(g, drive, offense, defense, scoring) {
+    const W = 1200, H = 420, X = (yte) => 100 + (100 - yte) * 10; // yards to end zone -> x
+    const oc = bandColor(offense || {}), dc = bandColor(defense || {});
+    let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect width="${W}" height="${H}" fill="#1f5b33"/>`;
+    for (let i = 0; i < 10; i++) if (i % 2) svg += `<rect x="${100 + i * 100}" width="100" height="${H}" fill="#226338"/>`;
+    svg += `<rect width="100" height="${H}" fill="${oc}" opacity=".85"/><rect x="1100" width="100" height="${H}" fill="${dc}" opacity=".85"/>`;
+    svg += `<text x="50" y="${H / 2}" fill="${inkFor(oc)}" font-size="40" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 50 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(offense?.abbr || '')}</text>`;
+    svg += `<text x="1150" y="${H / 2}" fill="${inkFor(dc)}" font-size="40" font-weight="800" text-anchor="middle" dominant-baseline="middle" transform="rotate(90 1150 ${H / 2})" font-family="Barlow Condensed, sans-serif">${esc(defense?.abbr || '')}</text>`;
+    for (let yd = 10; yd < 100; yd += 10) {
+      const x = 100 + yd * 10, n = yd <= 50 ? yd : 100 - yd;
+      svg += `<line x1="${x}" x2="${x}" y1="0" y2="${H}" stroke="#ffffff" stroke-opacity=".35" stroke-width="2"/>`;
+      svg += `<text x="${x}" y="${H - 14}" fill="#fff" fill-opacity=".55" font-size="26" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif">${n}</text>`;
+    }
+    const plays = ((drive && drive.plays) || []).filter((p) => p.from != null && p.to != null);
+    const shown = plays.slice(-12);
+    const top = 78, rowH = Math.min(30, (H - top - 60) / Math.max(shown.length, 6));
+    shown.forEach((p, i) => {
+      const x1 = X(p.from), x2 = X(p.to), y = top + i * rowH;
+      const gain = p.to <= p.from;
+      // Gains in the offense's color (white if it's too dark to see), lost yards gray, the score gold.
+      const gainColor = luminance(oc) < 0.04 ? '#f5f3ee' : oc;
+      const color = p.scoring ? '#ffd166' : gain ? gainColor : '#8b929c';
+      const a = Math.min(x1, x2), w = Math.max(Math.abs(x2 - x1), 6);
+      svg += `<rect x="${a}" y="${y}" width="${w}" height="${rowH * .62}" rx="${rowH * .3}" fill="${color}" stroke="#000" stroke-opacity=".25"/>`;
+      svg += `<circle cx="${x2}" cy="${y + rowH * .31}" r="${rowH * .36}" fill="#fff"/>`;
+    });
+    // Line of scrimmage and the first-down line, from the live situation.
+    if (!scoring && g.state === 'in' && g.yardsToEndzone != null) {
+      const los = X(g.yardsToEndzone);
+      svg += `<line x1="${los}" x2="${los}" y1="0" y2="${H}" stroke="#4f8cff" stroke-width="6"/>`;
+      if (g.distance && g.distance < g.yardsToEndzone) {
+        const fd = X(g.yardsToEndzone - g.distance);
+        svg += `<line x1="${fd}" x2="${fd}" y1="0" y2="${H}" stroke="#ffd166" stroke-width="6"/>`;
+      }
+      svg += `<ellipse cx="${los}" cy="${H - 48}" rx="16" ry="10" fill="#8b4a1c" stroke="#fff" stroke-width="2"/>`;
+    }
+    return svg + '</svg>';
+  }
+
+  function renderGridiron(g) {
+    const d = g.drives || {};
+    const scoring = Date.now() < scoreDriveUntil && d.lastScore;
+    const drive = scoring ? d.lastScore : (d.current || d.last);
+    const offAbbr = drive ? drive.team : null;
+    const offense = [g.home, g.away].find((t) => t && (t.abbr === offAbbr || (!offAbbr && t.id === g.possession))) || g.away;
+    const defense = offense === g.home ? g.away : g.home;
+    const clock = g.state === 'post' ? (g.detail || 'Final') : statusBar(g).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    giEl.querySelector('.gi-bar').innerHTML = giTeam(g.away, 'away', g) +
+      `<div class="gi-mid"><div class="clock">${esc(clock)}</div><div class="dd">${esc(g.state === 'in' && !scoring ? (g.downDistance || '') : '')}</div></div>` + giTeam(g.home, 'home', g);
+    const label = scoring ? `<div class="gi-label score">Scoring drive · ${esc(offense.abbr)} · ${esc(d.lastScore.description || d.lastScore.result)}</div>`
+      : drive ? `<div class="gi-label">${esc(offense.abbr)} drive${drive.description ? ' · ' + esc(drive.description) : ''}</div>` : '';
+    giEl.querySelector('.gi-field').innerHTML = fieldSVG(g, drive, offense, defense, scoring) + label;
+    const plays = (drive && drive.plays) || [];
+    const last = plays[plays.length - 1];
+    const text = last ? last.text : g.lastPlay || '';
+    const faces = ((last && last.players) || []).map((p) => `<div class="gi-face">${p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">` : '<span class="ph"></span>'}<span>${esc(p.short || p.name)}</span></div>`).join('');
+    const sub = last ? [last.downText, last.clock && `${periodName({ ...g, period: last.period || g.period })} ${last.clock}`].filter(Boolean).join(' · ') : '';
+    const html = `<div class="gi-faces">${faces}</div><div class="gi-text">${sub ? `<small>${esc(sub)}</small>` : ''}${esc(text)}</div>`;
+    const playEl = giEl.querySelector('.gi-play');
+    if (playEl._html !== html) { playEl._html = html; playEl.innerHTML = html; }
+  }
+
   function render() {
     if (!state) return;
     if (state.buffering) { topEl.innerHTML = `<div class="empty">Lining up with your TV (${state.delaySeconds}s)…</div>`; restEl.innerHTML = ''; setPlay(''); return; }
@@ -737,14 +906,17 @@
     document.body.classList.toggle('field', g.kind === 'field');
     if (g.kind === 'field') return renderField(g);
     const featured = featuredTeam(follow, g);
+    const football = /nfl|football|cfl|ufl/.test(g.league);
+    document.body.classList.toggle('gridiron', fieldView && football && g.state !== 'pre');
+    if (fieldView && football && g.state !== 'pre') return renderGridiron(g);
     if (logoView) return renderLogo(featured, g);
     if (sideView) return renderSide(g);
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');
     topEl.innerHTML = statusBar(g) + teamBand(g.away, 'away', g) + teamBand(g.home, 'home', g) + situation(g);
     setPlay(g.state === 'in' ? g.lastPlay : '');
-    restEl.innerHTML = middle(g) + (g.state === 'pre' ? '<div class="spacer"></div>' : '') +
-      (online ? '' : '<footer class="foot"><span class="bad">Reconnecting to Game Day…</span></footer>');
+    setWithCountdown(restEl, middle(g) + (g.state === 'pre' ? '<div class="spacer"></div>' : '') +
+      (online ? '' : '<footer class="foot"><span class="bad">Reconnecting to Game Day…</span></footer>'), g);
     if (!tickerRunning) runTicker();
   }
 
@@ -977,6 +1149,10 @@
     const mine = ev.test || ev.follow === featuredFollow();
     // Who the room cheers for: your team, or the side(s) picked on the calendar.
     const cheer = ev.cheerTeams || [ev.follow];
+    if (ev.type === 'score' && (ev.kind === 'touchdown' || ev.kind === 'fieldgoal') && ev.follow === featuredFollow()) {
+      scoreDriveUntil = Date.now() + 60000; // the field view shows the scoring drive for a minute
+      setTimeout(render, 2500);
+    }
     if (ev.type === 'score' && cheer.includes(ev.team) && mine) {
       if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow, null, ev.team);
       if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow, team: ev.team });
