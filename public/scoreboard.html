@@ -209,6 +209,22 @@
   .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
   .slotdots i { width: 2vmin; height: 2vmin; border-radius: 50%; background: rgba(255,255,255,.3); }
   .slotdots i.on { background: #f5f3ee; }
+
+  /* Pregame matchup panel */
+  .mu { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2.2vmin; color: #f5f3ee; }
+  .mu h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .mu-win b { font-size: 9vmin; font-weight: 800; }
+  .mu-win span { font-size: 4.6vmin; color: var(--muted); margin-left: 1.5vmin; }
+  .mu-win .bar { height: 1.8vmin; background: rgba(255,255,255,.1); margin-top: 1.2vmin; }
+  .mu-win .bar i { display: block; height: 100%; background: var(--sd-band-bright, var(--accent)); }
+  .mu-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 5.2vmin; font-weight: 700; padding-bottom: 1.2vmin; border-bottom: .3vmin solid rgba(255,255,255,.08); }
+  .mu-row span { font-size: 4.4vmin; font-weight: 500; color: var(--muted); }
+  .mu-cmp { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 2vmin; font-size: 5.2vmin; font-weight: 800; padding-bottom: 1.1vmin; border-bottom: .3vmin solid rgba(255,255,255,.08); }
+  .mu-cmp span { font-size: 3.8vmin; font-weight: 500; color: var(--muted); text-align: center; }
+  .mu-cmp b:last-child { text-align: right; }
+  .mu-cmp.head b { font-size: 4.6vmin; color: var(--muted); }
+  .mu-note { font-size: 4.4vmin; font-weight: 600; color: #f5f3ee; }
+  .mu-note small { display: block; font-size: 3.6vmin; font-weight: 500; color: var(--muted); }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -594,6 +610,49 @@
     return `<header class="status">${when}${dots}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
   }
 
+  // ---- Pregame matchup panel: takes turns with last 5 / players to watch ----
+  // Every 2 minutes (?precycle=<seconds>); the two TVs out of step, like the live panels.
+  const PRE_MS = Math.max(10, Number(params.get('precycle')) || 120) * 1000;
+  function preShowsMatchup() {
+    const phase = Math.floor(Date.now() / PRE_MS) % 2;
+    return (phase === 1) === (sideView !== 'home');
+  }
+  const pct = (v) => `${Math.round(v)}%`;
+
+  function matchupNotes(m) {
+    return (m.series ? `<div class="mu-note"><small>Head to head this season</small>${esc(m.series)}</div>` : '') +
+      (m.line ? `<div class="mu-note"><small>Line</small>${esc(m.line)}</div>` : '');
+  }
+
+  function matchupOne(g, t) {
+    const m = g.matchup, mt = m && m.teams && m.teams[t.abbr];
+    if (!mt) return '';
+    const rows = [];
+    if (mt.total) rows.push(['Record', mt.total]);
+    const venue = mt.home ? mt.homeRec : mt.roadRec;
+    if (venue) rows.push([mt.home ? 'At home' : 'On the road', venue]);
+    if (mt.streak) rows.push(['Streak', mt.streak]);
+    for (const st of mt.stats || []) rows.push([st.label, st.value]);
+    const win = Number.isFinite(mt.winPct) ? `<div class="mu-win"><b>${pct(mt.winPct)}</b><span>chance to win</span><div class="bar"><i style="width:${Math.max(2, Math.min(100, mt.winPct))}%"></i></div></div>` : '';
+    if (!win && !rows.length && !m.series && !m.line) return '';
+    return `<div class="mu"><h4>Matchup</h4>${win}${rows.map(([l, v]) => `<div class="mu-row"><span>${esc(l)}</span>${esc(v)}</div>`).join('')}${matchupNotes(m)}</div>`;
+  }
+
+  function matchupBoth(g) {
+    const m = g.matchup;
+    const a = m && m.teams && g.away && m.teams[g.away.abbr], h = m && m.teams && g.home && m.teams[g.home.abbr];
+    if (!a || !h) return '';
+    const rows = [];
+    if (Number.isFinite(a.winPct) && Number.isFinite(h.winPct)) rows.push([pct(a.winPct), 'Win chance', pct(h.winPct)]);
+    if (a.total || h.total) rows.push([a.total || '', 'Record', h.total || '']);
+    if (a.roadRec || h.homeRec) rows.push([a.roadRec || '', 'Road / home', h.homeRec || '']);
+    if (a.streak || h.streak) rows.push([a.streak || '', 'Streak', h.streak || '']);
+    for (const st of a.stats || []) { const o = (h.stats || []).find((x) => x.label === st.label); rows.push([st.value, st.label, o ? o.value : '']); }
+    if (!rows.length && !m.series && !m.line) return '';
+    return `<div class="mu"><h4>Matchup</h4><div class="mu-cmp head"><b>${esc(g.away.abbr)}</b><span></span><b>${esc(g.home.abbr)}</b></div>` +
+      rows.map(([x, l, y]) => `<div class="mu-cmp"><b>${esc(x)}</b><span>${esc(l)}</span><b>${esc(y)}</b></div>`).join('') + matchupNotes(m) + '</div>';
+  }
+
   // ---- Pregame panels ----
   function countdownText(g) {
     const ms = Date.parse(g.start) - Date.now();
@@ -651,7 +710,7 @@
   window.addEventListener('resize', () => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
 
   function fitPlayers(el) {
-    const cards = [...el.querySelectorAll('.pg-player')];
+    const cards = [...el.querySelectorAll('.pg-player, .mu-row, .mu-cmp:not(.head), .mu-note')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
@@ -662,7 +721,8 @@
 
   function middle(g) {
     if (g.state === 'pre') {
-      const pg = pregameBoth(g);
+      const players = pregameBoth(g), mu = matchupBoth(g);
+      const pg = mu && (!players || preShowsMatchup()) ? mu : players;
       const cd = countdownText(g) ? `<div class="countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '';
       return cd + pg;
     }
@@ -817,7 +877,8 @@
     sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
     let mid = '';
     if (g.state === 'pre') {
-      const pg = pregameOne(g, t);
+      const players = pregameOne(g, t), mu = matchupOne(g, t);
+      const pg = mu && (!players || preShowsMatchup()) ? mu : players;
       mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
@@ -839,7 +900,7 @@
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
     document.body.classList.toggle('drive-on', mid.includes('sd-panes show-drive'));
-    document.body.classList.toggle('pregame', g.state === 'pre' && mid.includes('class="pg"'));
+    document.body.classList.toggle('pregame', g.state === 'pre' && (mid.includes('class="pg"') || mid.includes('class="mu"')));
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }

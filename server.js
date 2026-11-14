@@ -7,7 +7,7 @@ const path = require('path');
 const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, pickStats } = require('./lib/stats');
-const { pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
+const { pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -241,6 +241,7 @@ function readSummary(summary, game) {
     stats: pickStats(summary, game.league, game.away?.id, game.home?.id),
     form: pickForm(summary),
     leaders: pickLeaders(summary, sportPath),
+    matchup: pickMatchup(summary),
     drives: /football|nfl|cfl|ufl/.test(game.league) ? pickDrives(summary, people) : null,
   };
 }
@@ -267,7 +268,7 @@ async function addStats(games) {
     const extra = summaryCache.get(game.id)?.extra;
     if (!extra) continue;
     game.stats = game.state === 'pre' ? [] : extra.stats;
-    if (game.state === 'pre') { game.form = extra.form; game.leaders = extra.leaders; }
+    if (game.state === 'pre') { game.form = extra.form; game.leaders = extra.leaders; game.matchup = extra.matchup; }
     if (game.state === 'in' && extra.drives) game.drives = extra.drives;
     if (game.state === 'post' && extra.drives) game.drives = { lastScore: extra.drives.lastScore };
   }
