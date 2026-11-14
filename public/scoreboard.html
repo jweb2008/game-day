@@ -225,6 +225,18 @@
   .mu-cmp.head b { font-size: 4.6vmin; color: var(--muted); }
   .mu-note { font-size: 4.4vmin; font-weight: 600; color: #f5f3ee; }
   .mu-note small { display: block; font-size: 3.6vmin; font-weight: 500; color: var(--muted); }
+
+  /* Pregame spotlight: a top player, game by game */
+  .sp { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
+  .sp h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .sp-total { font-size: 5vmin; font-weight: 700; }
+  .sp-total b { font-size: 8vmin; margin-right: 1.2vmin; }
+  .sp-bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2.4vmin; align-items: end; height: var(--sp-h, 34vmin); }
+  .sp-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .sp-bar b { font-size: 5.4vmin; font-weight: 800; margin-bottom: 1vmin; }
+  .sp-bar i { display: block; width: 100%; border-radius: 1vmin 1vmin 0 0; background: var(--sd-band-bright, var(--accent)); min-height: .8vmin; }
+  .sp-bar small { font-size: 3.4vmin; color: var(--muted); margin-top: 1vmin; white-space: nowrap; }
+  .sp-bar small.W { color: #5ad19a; } .sp-bar small.L { color: #ff7b7b; }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -613,10 +625,6 @@
   // ---- Pregame matchup panel: takes turns with last 5 / players to watch ----
   // Every 2 minutes (?precycle=<seconds>); the two TVs out of step, like the live panels.
   const PRE_MS = Math.max(10, Number(params.get('precycle')) || 120) * 1000;
-  function preShowsMatchup() {
-    const phase = Math.floor(Date.now() / PRE_MS) % 2;
-    return (phase === 1) === (sideView !== 'home');
-  }
   const pct = (v) => `${Math.round(v)}%`;
 
   function matchupNotes(m) {
@@ -651,6 +659,37 @@
     if (!rows.length && !m.series && !m.line) return '';
     return `<div class="mu"><h4>Matchup</h4><div class="mu-cmp head"><b>${esc(g.away.abbr)}</b><span></span><b>${esc(g.home.abbr)}</b></div>` +
       rows.map(([x, l, y]) => `<div class="mu-cmp"><b>${esc(x)}</b><span>${esc(l)}</span><b>${esc(y)}</b></div>`).join('') + matchupNotes(m) + '</div>';
+  }
+
+  // Spotlight: the team's top player in its first category, one bar per game over the last five.
+  function spotlightBlock(sp, compact) {
+    if (!sp || !(sp.games || []).length) return '';
+    const max = Math.max(1, ...sp.games.map((x) => x.value));
+    const total = sp.games.reduce((a, x) => a + x.value, 0);
+    const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
+    const bars = sp.games.map((x) => `<div class="sp-bar"><b>${fmt(x.value)}</b><i style="height:${Math.round((x.value / max) * 100)}%"></i>` +
+      `<small class="${esc(x.result)}">${esc(x.atVs === '@' ? '@' : 'v')} ${esc(x.opp)}</small></div>`).join('');
+    const who = playerRow({ ...sp, value: '' });
+    return `${who}<div class="sp-total"><b>${fmt(total)}</b>${esc((sp.label || '').toLowerCase())} in the last ${sp.games.length}</div><div class="sp-bars">${bars}</div>`;
+  }
+  function spotlightOne(g, t) {
+    const sp = g.spotlight && g.spotlight[t.abbr];
+    const body = spotlightBlock(sp);
+    return body ? `<div class="sp"><h4>Spotlight · last ${sp.games.length} games</h4>${body}</div>` : '';
+  }
+  // Combined scoreboard: room for one, so your team's player (or the side you cheer for).
+  function spotlightBoth(g) {
+    const follow = featuredFollow();
+    const mine = featuredTeam(follow, g);
+    const t = (mine && g.spotlight && g.spotlight[mine.abbr]) ? mine : [g.away, g.home].find((x) => x && g.spotlight && g.spotlight[x.abbr]);
+    return t ? spotlightOne(g, t).replace('<h4>Spotlight', `<h4>${esc(t.abbr)} spotlight`) : '';
+  }
+  // Pregame panels take turns: players, matchup, spotlight (whichever have data).
+  function prePanel(list) {
+    const have = list.filter(Boolean);
+    if (!have.length) return '';
+    const turn = Math.floor(Date.now() / PRE_MS) + (sideView === 'home' ? 1 : 0);
+    return have[turn % have.length];
   }
 
   // ---- Pregame panels ----
@@ -710,7 +749,7 @@
   window.addEventListener('resize', () => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
 
   function fitPlayers(el) {
-    const cards = [...el.querySelectorAll('.pg-player, .mu-row, .mu-cmp:not(.head), .mu-note')];
+    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
@@ -721,8 +760,7 @@
 
   function middle(g) {
     if (g.state === 'pre') {
-      const players = pregameBoth(g), mu = matchupBoth(g);
-      const pg = mu && (!players || preShowsMatchup()) ? mu : players;
+      const pg = prePanel([pregameBoth(g), matchupBoth(g), spotlightBoth(g)]);
       const cd = countdownText(g) ? `<div class="countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '';
       return cd + pg;
     }
@@ -877,8 +915,7 @@
     sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
     let mid = '';
     if (g.state === 'pre') {
-      const players = pregameOne(g, t), mu = matchupOne(g, t);
-      const pg = mu && (!players || preShowsMatchup()) ? mu : players;
+      const pg = prePanel([pregameOne(g, t), matchupOne(g, t), spotlightOne(g, t)]);
       mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
@@ -900,7 +937,7 @@
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
     document.body.classList.toggle('drive-on', mid.includes('sd-panes show-drive'));
-    document.body.classList.toggle('pregame', g.state === 'pre' && (mid.includes('class="pg"') || mid.includes('class="mu"')));
+    document.body.classList.toggle('pregame', g.state === 'pre' && /class="(pg|mu|sp)/.test(mid));
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }

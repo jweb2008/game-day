@@ -6,8 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
-const { fetchSummary, pickStats } = require('./lib/stats');
-const { pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
+const { fetchSummary, fetchGamelog, pickStats } = require('./lib/stats');
+const { pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -246,6 +246,26 @@ function readSummary(summary, game) {
   };
 }
 
+// Spotlight (pregame): each team's top player in its first leader category (goals, passing yards...),
+// game by game over their last five. Game logs change once a game, so they're kept for 6 hours.
+const gamelogCache = new Map(); // athleteId -> { t, data }
+async function spotlight(game, leaders) {
+  const out = {};
+  for (const [abbr, list] of Object.entries(leaders || {})) {
+    const p = (list || [])[0];
+    if (!p || !p.id || !p.stat) continue;
+    let c = gamelogCache.get(p.id);
+    if (!c || Date.now() - c.t > 6 * 3600 * 1000) {
+      try { c = { t: Date.now(), data: await fetchGamelog(sportOf(game.league), game.league, p.id) }; }
+      catch (err) { console.error('game log error:', err.message); c = { t: Date.now() - 5 * 3600 * 1000, data: null }; } // retry in an hour
+      gamelogCache.set(p.id, c);
+    }
+    const games = c.data ? pickLastFive(c.data, p.stat) : null;
+    if (games && games.length) out[abbr] = { name: p.name, short: p.short, pos: p.pos, headshot: p.headshot, label: p.label, games };
+  }
+  return out;
+}
+
 async function addStats(games) {
   const seen = new Set();
   for (const game of Object.values(games)) {
@@ -268,7 +288,10 @@ async function addStats(games) {
     const extra = summaryCache.get(game.id)?.extra;
     if (!extra) continue;
     game.stats = game.state === 'pre' ? [] : extra.stats;
-    if (game.state === 'pre') { game.form = extra.form; game.leaders = extra.leaders; game.matchup = extra.matchup; }
+    if (game.state === 'pre') {
+      game.form = extra.form; game.leaders = extra.leaders; game.matchup = extra.matchup;
+      game.spotlight = await spotlight(game, extra.leaders);
+    }
     if (game.state === 'in' && extra.drives) game.drives = extra.drives;
     if (game.state === 'post' && extra.drives) game.drives = { lastScore: extra.drives.lastScore };
   }
