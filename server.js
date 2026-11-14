@@ -7,7 +7,7 @@ const path = require('path');
 const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
-const { pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
+const { pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -85,6 +85,35 @@ function fillTeam(t, dir) {
   t.name = t.name || d.name;
   t.fullName = t.fullName || d.fullName;
   if (d.logo && (!t.logo || /\/500\/[a-z]+\.png$/.test(t.logo))) t.logo = d.logo;
+}
+
+// A team's next games after a given one, with each opponent's record (from the standings when we
+// have them). Schedules are kept 6 hours.
+const fullSchedCache = new Map(); // league:abbr -> { t, games }
+async function upcomingFor(lg, abbr, after, count, standingRows) {
+  const key = `${lg.league}:${abbr}`;
+  let c = fullSchedCache.get(key);
+  if (!c || Date.now() - c.t > 6 * 3600 * 1000) {
+    try {
+      const sched = await fetchTeamSchedule(lg.sport, lg.league, abbr);
+      c = { t: Date.now(), games: (sched.events || []).map((ev) => normalizeEvent(ev, lg.league)).filter((g) => g.start && g.home && g.away) };
+    } catch (err) {
+      console.error('schedule error:', err.message);
+      c = { t: Date.now() - 5 * 3600 * 1000, games: c ? c.games : [] };
+    }
+    fullSchedCache.set(key, c);
+  }
+  const from = Date.parse(after.start || 0);
+  const rec = (a) => ((standingRows || []).find((r) => r.abbr === a) || {}).record || null;
+  return c.games
+    .filter((g) => g.id !== after.id && Date.parse(g.start) > from && g.state !== 'post')
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
+    .slice(0, count)
+    .map((g) => {
+      const home = g.home.abbr === abbr;
+      const opp = home ? g.away : g.home;
+      return { start: g.start, home, broadcast: g.broadcast, opp: { abbr: opp.abbr, name: opp.name, logo: opp.logo, record: rec(opp.abbr) || opp.record || null } };
+    });
 }
 
 async function nextFromSchedule(lg, abbr) {
@@ -237,12 +266,14 @@ function summaryDue(game, cached) {
 function readSummary(summary, game) {
   const sportPath = HEADSHOT_PATH[game.league] || null;
   const people = pickPeople(summary, sportPath);
+  const box = pickBox(summary, sportPath);
   return {
+    stars: game.state === 'post' ? pickStars(summary, game, box) : null,
     stats: pickStats(summary, game.league, game.away?.id, game.home?.id),
     form: pickForm(summary),
     leaders: pickLeaders(summary, sportPath),
     matchup: pickMatchup(summary),
-    box: pickBox(summary),
+    box: pickBox(summary, sportPath),
     drives: /football|nfl|cfl|ufl/.test(game.league) ? pickDrives(summary, people) : null,
   };
 }
@@ -311,6 +342,16 @@ async function addStats(games) {
       game.standings = await standingsFor(game.league);
     }
     if (game.state !== 'pre' && extra.box && Object.keys(extra.box).length) game.box = extra.box;
+    // Upcoming games: the next five for each team before this game, the very next one after it.
+    if (game.state === 'pre' || game.state === 'post') {
+      const rows = game.state === 'post' ? await standingsFor(game.league) : game.standings;
+      const lg = { sport: sportOf(game.league), league: game.league };
+      game.upcoming = {};
+      for (const t of [game.away, game.home]) {
+        if (t && t.abbr) game.upcoming[t.abbr] = await upcomingFor(lg, t.abbr, game, game.state === 'pre' ? 5 : 1, rows);
+      }
+    }
+    if (game.state === 'post' && extra.stars && extra.stars.length) game.stars = extra.stars;
     if (game.state === 'in' && extra.drives) game.drives = extra.drives;
     if (game.state === 'post' && extra.drives) game.drives = { lastScore: extra.drives.lastScore };
   }

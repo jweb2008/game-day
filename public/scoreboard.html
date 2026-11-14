@@ -280,6 +280,21 @@
   .st-row.hl { background: rgba(255,255,255,.1); border-left: 1vmin solid var(--sd-band-bright, var(--accent)); }
   .st-row.gap { color: var(--muted); padding: 0 1.2vmin; }
   .st-cut { border-top: .5vmin dashed rgba(255,255,255,.4); margin: .8vmin 0; }
+
+  /* Next 5 and the postgame panels */
+  .nx { display: flex; flex-direction: column; }
+  .nx-row { display: grid; grid-template-columns: 1fr 6vmin 7vmin 12vmin 15vmin; align-items: center; gap: 1.6vmin; font-size: 4.6vmin; font-weight: 700; padding: 1vmin 0; border-bottom: .25vmin solid rgba(255,255,255,.07); }
+  .nx-row .when { font-weight: 500; color: #cfd6e2; font-size: 4vmin; white-space: nowrap; }
+  .nx-row .at { color: var(--muted); font-weight: 600; text-align: center; }
+  .nx-row img { width: 6.5vmin; height: 6.5vmin; object-fit: contain; }
+  .nx-row .rec { color: var(--muted); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .pg-player.star .nm em { font-style: normal; color: #ffd166; font-size: 4.2vmin; }
+  .nextup .nu-card { display: flex; align-items: center; gap: 4vmin; margin-top: 2vmin; }
+  .nextup .nu-card img { width: 30vmin; height: 30vmin; object-fit: contain; filter: drop-shadow(0 1.5vmin 2vmin rgba(0,0,0,.35)); }
+  .nextup .nu-txt b { display: block; font-size: 7.4vmin; font-weight: 800; line-height: 1.05; }
+  .nextup .nu-txt span { display: block; font-size: 5vmin; color: var(--muted); margin-top: 1vmin; }
+  .nextup .nu-when { margin-top: 3vmin; font-size: 5vmin; color: #cfd6e2; }
+  .nextup .nu-when b { display: block; font-size: 8vmin; color: #f5f3ee; }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -814,6 +829,45 @@
     return panels;
   }
 
+  // ---- Last 5 · Next 5, and the postgame panels ----
+  function dayTime(iso) {
+    const d = new Date(iso);
+    return `${d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric', timeZone: tz() })} · ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}`;
+  }
+  function nextRow(x) {
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
+    return `<div class="nx-row"><span class="when">${esc(dayTime(x.start))}</span><span class="at">${x.home ? 'vs' : '@'}</span>${pic}<span class="nm">${esc(x.opp.abbr)}</span><span class="rec">${esc(x.opp.record || '')}</span></div>`;
+  }
+  function scheduleOne(g, t) {
+    const list = (g.upcoming || {})[t.abbr] || [];
+    const form = formRow(t, (g.form || {})[t.abbr]);
+    if (!list.length) return '';
+    return `<div class="pg">${form ? `<h4>Last 5</h4>${form}` : ''}<h4>Next ${list.length}</h4><div class="nx">${list.map(nextRow).join('')}</div></div>`;
+  }
+
+  // Postgame: stars of the game.
+  function starsHTML(g) {
+    const stars = g.stars || [];
+    if (!stars.length) return '';
+    const hockey = /hockey|nhl/.test(g.league);
+    return `<div class="pg"><h4>${hockey ? 'Three stars' : 'Top performers'}</h4>` + stars.map((p, i) => {
+      const pic = p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">` : '<span class="ph"></span>';
+      return `<div class="pg-player star">${pic}<span class="nm">${hockey ? `<em>${'★'.repeat(i + 1)}</em> ` : ''}${esc(p.short || p.name)}<small>${esc([p.team, p.pos, p.label].filter(Boolean).join(' · '))}</small></span><span class="val">${esc(p.line)}</span></div>`;
+    }).join('') + '</div>';
+  }
+  // Postgame: this team's next game.
+  function nextGameHTML(g, t) {
+    const x = ((g.upcoming || {})[t.abbr] || [])[0];
+    if (!x) return '';
+    const days = Math.round((new Date(x.start).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+    const when = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '';
+    return `<div class="pg nextup"><h4>Up next for ${esc(t.name || t.abbr)}</h4>` +
+      `<div class="nu-card">${pic}<div class="nu-txt"><b>${x.home ? 'vs' : '@'} ${esc(x.opp.name || x.opp.abbr)}</b>` +
+      `<span>${esc(x.opp.record ? `${x.opp.abbr} ${x.opp.record}` : x.opp.abbr)}</span></div></div>` +
+      `<div class="nu-when"><b>${esc(when)}</b>${esc(dayTime(x.start))}${x.broadcast ? ` · ${esc(x.broadcast)}` : ''}</div></div>`;
+  }
+
   // ---- Pregame panels ----
   function countdownText(g) {
     const ms = Date.parse(g.start) - Date.now();
@@ -875,20 +929,27 @@
   function fitPlayers(el) {
     const panes = el.querySelectorAll ? [...el.querySelectorAll('.sd-pane')] : [];
     if (panes.length) { panes.forEach(fitPlayers); return; }
-    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .st-row:not(.head):not(.hl)')];
+    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .st-row:not(.head):not(.hl), .nx-row')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
     while (over() && cards.length) cards.pop().style.display = 'none';
-    const head = el.querySelector('.pg h4:last-of-type');
+    // The "Players to watch" heading goes if every card under it had to go.
+    const head = el.querySelector('.pg-player') ? el.querySelector('.pg h4:last-of-type') : null;
     if (head) head.style.display = el.querySelector('.pg-player:not([style*="none"])') ? '' : 'none';
   }
 
   function middle(g) {
     if (g.state === 'pre') {
-      const pg = prePanel([pregameBoth(g), matchupBoth(g), spotlightBoth(g), ...standingsPanels(g, featuredTeam(featuredFollow(), g))]);
+      const ft = featuredTeam(featuredFollow(), g);
+      const pg = prePanel([pregameBoth(g), ft && scheduleOne(g, ft), matchupBoth(g), spotlightBoth(g), ...standingsPanels(g, ft)]);
       const cd = countdownText(g) ? `<div class="countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '';
       return cd + pg;
+    }
+    if (g.state === 'post') {
+      const ft = featuredTeam(featuredFollow(), g);
+      const panel = prePanel([statBars(g), starsHTML(g), ft && nextGameHTML(g, ft)]);
+      return panel + '<div class="spacer"></div>';
     }
     let html = '';
     html += statBars(g);
@@ -1041,8 +1102,17 @@
     sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
     let mid = '';
     if (g.state === 'pre') {
-      const pg = prePanel([pregameOne(g, t), matchupOne(g, t), spotlightOne(g, t), ...standingsPanels(g, t)]);
+      const pg = prePanel([pregameOne(g, t), scheduleOne(g, t), matchupOne(g, t), spotlightOne(g, t), ...standingsPanels(g, t)]);
       mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
+    } else if (g.state === 'post' && (g.stars || g.upcoming || (g.stats || []).length)) {
+      // Postgame: this team's stats, the stars of the game and its next game take turns.
+      const stats = (g.stats || []).length ? '<div class="sd-stats">' + g.stats.slice(0, 8).map((r) => {
+        const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
+        const max = Math.max(r.homeAmount, r.awayAmount) || 1;
+        return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
+          `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
+      }).join('') + '</div>' : '';
+      mid = prePanel([stats, starsHTML(g), nextGameHTML(g, t)]);
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
       mid = '<div class="sd-stats">' + t.periods.map((v, i) => {
