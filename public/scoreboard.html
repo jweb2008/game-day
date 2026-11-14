@@ -266,6 +266,10 @@
   body.side.drive-on .sd-logo, body.side.drive-on .sd-city, body.side.drive-on .sd-record, body.side.drive-on .sd-tag,
   body.side.drive-on .sd-sit, body.side.drive-on #play { display: none; }
   body.side.drive-on .sd-hero { padding-bottom: 6vmin; }
+  /* Pregame with form and players to watch: a smaller logo so all the player cards fit. */
+  body.side.pregame .sd-logo { width: 22vmin; height: 22vmin; margin: 1vmin 0 1.5vmin; }
+  body.side.pregame .sd-hero { padding-bottom: 6vmin; }
+  body.side.pregame .sd-score-row, body.side.pregame #play { display: none; }
   .sd-drive-head { margin: 3vmin 5vmin 0; font-size: 5.6vmin; font-weight: 800; color: #f5f3ee; letter-spacing: .04em; text-transform: uppercase; }
   .sd-drive-head small { display: block; font-size: 4vmin; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; margin-top: .6vmin; }
   .sd-drive-head.score { color: #ffd166; }
@@ -818,6 +822,7 @@
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
     document.body.classList.toggle('drive-on', mid.includes('sd-panes show-drive'));
+    document.body.classList.toggle('pregame', g.state === 'pre' && mid.includes('class="pg"'));
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }
