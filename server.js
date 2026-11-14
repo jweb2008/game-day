@@ -6,8 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
-const { fetchSummary, fetchGamelog, pickStats } = require('./lib/stats');
-const { pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
+const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
+const { pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -242,8 +242,25 @@ function readSummary(summary, game) {
     form: pickForm(summary),
     leaders: pickLeaders(summary, sportPath),
     matchup: pickMatchup(summary),
+    box: pickBox(summary),
     drives: /football|nfl|cfl|ufl/.test(game.league) ? pickDrives(summary, people) : null,
   };
+}
+
+// Standings for pregame screens, per league, refreshed every 30 minutes.
+const standingsCache = new Map(); // league -> { t, rows }
+async function standingsFor(lg) {
+  const c = standingsCache.get(lg);
+  if (c && Date.now() - c.t < 30 * 60 * 1000) return c.rows;
+  try {
+    const rows = pickStandings(await fetchStandings(sportOf(lg), lg));
+    standingsCache.set(lg, { t: Date.now(), rows });
+    return rows;
+  } catch (err) {
+    console.error('standings error:', err.message);
+    standingsCache.set(lg, { t: Date.now() - 25 * 60 * 1000, rows: c ? c.rows : null }); // retry in 5 minutes
+    return c ? c.rows : null;
+  }
 }
 
 // Spotlight (pregame): each team's top player in its first leader category (goals, passing yards...),
@@ -291,7 +308,9 @@ async function addStats(games) {
     if (game.state === 'pre') {
       game.form = extra.form; game.leaders = extra.leaders; game.matchup = extra.matchup;
       game.spotlight = await spotlight(game, extra.leaders);
+      game.standings = await standingsFor(game.league);
     }
+    if (game.state !== 'pre' && extra.box && Object.keys(extra.box).length) game.box = extra.box;
     if (game.state === 'in' && extra.drives) game.drives = extra.drives;
     if (game.state === 'post' && extra.drives) game.drives = { lastScore: extra.drives.lastScore };
   }

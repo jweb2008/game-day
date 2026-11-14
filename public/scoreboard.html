@@ -154,7 +154,7 @@
     transition: filter .8s;
   }
   .sd-hero.lost { filter: saturate(.3) brightness(.65); }
-  .sd-tag { font-size: 4vmin; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
+  .sd-tag { display: none; font-size: 4vmin; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
   .sd-logo { width: 40vmin; height: 40vmin; object-fit: contain; margin: 2vmin 0 2vmin;
     filter: drop-shadow(0 2.5vmin 3vmin rgba(0,0,0,.35)); animation: float 6s ease-in-out infinite alternate; }
   .sd-city { font-size: 5vmin; font-weight: 500; opacity: .85; line-height: 1; }
@@ -172,7 +172,7 @@
     border-left: 1.6vmin solid var(--sd-band-bright); background: rgba(255,255,255,.06); }
   .sd-sit.red-zone { border-left-color: #ff4d4d; }
   .sd-sit:empty { display: none; }
-  .sd-stats { margin: 3vmin 6vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
+  .sd-stats { margin: 2.6vmin 6vmin 0; display: flex; flex-direction: column; gap: 1.5vmin; color: #f5f3ee; }
   .sd-stat { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 1vmin; }
   .sd-stat .l { font-size: 4.4vmin; font-weight: 500; color: var(--muted); }
   .sd-stat .v { font-size: 5.8vmin; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -237,6 +237,39 @@
   .sp-bar i { display: block; width: 100%; border-radius: 1vmin 1vmin 0 0; background: var(--sd-band-bright, var(--accent)); min-height: .8vmin; }
   .sp-bar small { font-size: 3.4vmin; color: var(--muted); margin-top: 1vmin; white-space: nowrap; }
   .sp-bar small.W { color: #5ad19a; } .sp-bar small.L { color: #ff7b7b; }
+
+  .status .rz { color: #ff6b6b; }
+  /* The right TV's top bar carries down and distance, so its situation box would only repeat it. */
+  body.side.home-tv .sd-sit { display: none; }
+  /* Hockey box score on the team screens */
+  .bx { margin: 2.4vmin 5vmin 0; color: #f5f3ee; display: flex; flex-direction: column; }
+  .bx-row { display: grid; grid-template-columns: 1fr repeat(5, 10.5vmin); column-gap: .6vmin; align-items: baseline; font-size: 4.6vmin; padding: 1vmin 0; border-bottom: .25vmin solid rgba(255,255,255,.07); }
+  .bx-row span { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bx-row span small { display: inline-block; width: 6.5vmin; color: var(--muted); font-weight: 500; font-size: 3.6vmin; }
+  .bx-row b { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bx-row.head { font-size: 3.6vmin; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .bx-row.head b { font-weight: 600; }
+  .bx-gk { margin-bottom: 1.8vmin; }
+  .bx-goalie { display: flex; align-items: baseline; gap: 2.4vmin; font-size: 4.8vmin; padding: 1.2vmin 2vmin; background: rgba(255,255,255,.06); border-left: 1.2vmin solid var(--sd-band-bright); }
+  .bx-goalie span { font-weight: 800; flex: 1; }
+  .bx-goalie b { font-variant-numeric: tabular-nums; }
+  .bx-goalie small { color: var(--muted); font-size: 3.8vmin; }
+  .sd-pane { overflow: hidden; }
+
+  /* Pregame standings */
+  .st { margin: 2.4vmin 5vmin 0; color: #f5f3ee; display: flex; flex-direction: column; }
+  .st h4 { margin: 0 0 1vmin; font-size: 4vmin; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st-row { display: grid; grid-template-columns: 9vmin 7vmin 1fr auto 12vmin; align-items: center; gap: 2vmin; font-size: 4.8vmin; font-weight: 700; padding: .9vmin 1.2vmin; }
+  .st-row img { width: 6.5vmin; height: 6.5vmin; object-fit: contain; }
+  .st-row .rk { color: var(--muted); font-weight: 600; font-size: 4vmin; }
+  .st-row .nm small { font-size: 3.2vmin; color: var(--muted); font-weight: 600; }
+  .st-row .rec { font-weight: 500; color: #cfd6e2; font-variant-numeric: tabular-nums; }
+  .st-row b { text-align: right; font-variant-numeric: tabular-nums; }
+  .st-row.head { font-size: 3.4vmin; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding-top: 0; }
+  .st-row.head .rec { color: var(--muted); font-weight: 600; }
+  .st-row.hl { background: rgba(255,255,255,.1); border-left: 1vmin solid var(--sd-band-bright, var(--accent)); }
+  .st-row.gap { color: var(--muted); padding: 0 1.2vmin; }
+  .st-cut { border-top: .5vmin dashed rgba(255,255,255,.4); margin: .8vmin 0; }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -294,6 +327,11 @@
   body.side.drive-on .sd-logo, body.side.drive-on .sd-city, body.side.drive-on .sd-record, body.side.drive-on .sd-tag,
   body.side.drive-on .sd-sit, body.side.drive-on #play { display: none; }
   body.side.drive-on .sd-hero { padding-bottom: 6vmin; }
+  /* In the game: a smaller logo and no city line, so the full set of team stats fits. */
+  body.side.live .sd-logo { width: 22vmin; height: 22vmin; margin: 1vmin 0 1.5vmin; }
+  body.side.live .sd-city { display: none; }
+  body.side.live .sd-score { font-size: 25vmin; }
+  body.side.live .sd-hero { padding-bottom: 6vmin; }
   /* Pregame with form and players to watch: a smaller logo so all the player cards fit. */
   body.side.pregame .sd-logo { width: 22vmin; height: 22vmin; margin: 1vmin 0 1.5vmin; }
   body.side.pregame .sd-hero { padding-bottom: 6vmin; }
@@ -482,6 +520,7 @@
   // ?side=away (left TV) or ?side=home (right TV): one team per screen.
   const sideView = ['home', 'away'].includes((params.get('side') || '').toLowerCase()) ? params.get('side').toLowerCase() : null;
   document.body.classList.toggle('side', !!sideView);
+  document.body.classList.toggle('home-tv', sideView === 'home');
   document.body.classList.toggle('wide', logoView);
   document.body.classList.toggle('glow', params.get('glow') === '1');
   if (Number(params.get('size')) > 0) document.documentElement.style.setProperty('--lp-size', `${Math.min(100, Number(params.get('size')))}vmin`);
@@ -692,6 +731,75 @@
     return have[turn % have.length];
   }
 
+  // ---- Pregame standings: division, wild card race, conference, league ----
+  // Rows for the two teams in this game are highlighted. Hockey ranks by points; others by win %.
+  function sortStand(rows, g) {
+    const hockey = g.league === 'nhl' || /hockey/.test(g.league);
+    const n = (v) => (Number.isFinite(v) ? v : -1);
+    return [...rows].sort((a, b) => hockey
+      ? n(b.points) - n(a.points) || n(a.gp) - n(b.gp) || n(b.wins) - n(a.wins)
+      : n(b.pct) - n(a.pct) || n(b.wins) - n(a.wins));
+  }
+  function stTable(title, list, g, opts = {}) {
+    const hockey = g.league === 'nhl' || /hockey/.test(g.league);
+    const hl = new Set([g.home && g.home.abbr, g.away && g.away.abbr]);
+    const val = (r) => (hockey ? (r.points != null ? Math.round(r.points) : '') : (r.pct != null ? r.pct.toFixed(3).replace(/^0/, '') : ''));
+    const rows = list.map((item) => {
+      if (item === 'cut') return '<div class="st-cut"></div>';
+      if (item === 'gap') return '<div class="st-row gap"><span>…</span></div>';
+      const { r, rank } = item;
+      const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
+      return `<div class="st-row${hl.has(r.abbr) ? ' hl' : ''}"><span class="rk">${esc(rank)}</span>${pic}<span class="nm">${esc(r.abbr)}${r.clinch ? ` <small>${esc(r.clinch)}</small>` : ''}</span><span class="rec">${esc(r.record)}</span><b>${esc(val(r))}</b></div>`;
+    }).join('');
+    return `<div class="st"><h4>${esc(title)}</h4><div class="st-row head"><span class="rk">#</span><span></span><span class="nm">Team</span><span class="rec">Record</span><b>${hockey ? 'PTS' : 'PCT'}</b></div>${rows}</div>`;
+  }
+  // Top N, then the two teams in this game if they sit lower.
+  // At most `rows` lines: the top of the table, then "…" and this game's teams if they sit lower.
+  function topWith(sorted, rows, g) {
+    const want = new Set([g.home && g.home.abbr, g.away && g.away.abbr]);
+    const ranked = sorted.map((r, i) => ({ r, rank: i + 1 }));
+    const below = (n) => ranked.filter((x, i) => i >= n && want.has(x.r.abbr));
+    let n = rows;
+    while (n > 1 && below(n).length && n + 1 + below(n).length > rows) n--;
+    const extra = below(n);
+    return extra.length ? [...ranked.slice(0, n), 'gap', ...extra] : ranked.slice(0, n);
+  }
+  function standingsPanels(g, t) {
+    const all = g.standings;
+    const me = all && t && all.find((r) => r.abbr === t.abbr);
+    if (!me) return [];
+    const panels = [];
+    const hockey = g.league === 'nhl' || /hockey/.test(g.league);
+    if (me.div) {
+      const div = sortStand(all.filter((r) => r.div === me.div && r.conf === me.conf), g);
+      panels.push(stTable(me.div, div.map((r, i) => ({ r, rank: i + 1 })), g));
+    }
+    if (me.conf) {
+      const conf = all.filter((r) => r.conf === me.conf);
+      // Wild card race: hockey takes the top 3 of each division, then the next two by points;
+      // football uses ESPN's playoff seeds (5 to 7 are the wild cards).
+      let wc = null;
+      if (hockey && me.div) {
+        const leaders = new Set();
+        [...new Set(conf.map((r) => r.div))].forEach((d) => sortStand(conf.filter((r) => r.div === d), g).slice(0, 3).forEach((r) => leaders.add(r.abbr)));
+        const rest = sortStand(conf.filter((r) => !leaders.has(r.abbr)), g);
+        if (rest.length) {
+          const rows = rest.slice(0, 2).map((r, i) => ({ r, rank: `WC${i + 1}` }));
+          wc = [...rows, 'cut', ...rest.slice(2, 5).map((r) => ({ r, rank: '' }))];
+          if (!leaders.has(me.abbr) && !rest.slice(0, 5).includes(me)) wc.push('gap', { r: me, rank: '' });
+        }
+      } else if (conf.some((r) => Number.isFinite(r.seed))) {
+        const seeded = conf.filter((r) => Number.isFinite(r.seed) && r.seed >= 5 && r.seed <= 7).sort((a, b) => a.seed - b.seed);
+        const out = sortStand(conf.filter((r) => !Number.isFinite(r.seed) || r.seed > 7), g);
+        wc = [...seeded.map((r) => ({ r, rank: r.seed })), 'cut', ...out.slice(0, 3).map((r) => ({ r, rank: '' }))];
+      }
+      if (wc) panels.push(stTable(`${me.conf} · wild card`, wc, g));
+      panels.push(stTable(me.conf, topWith(sortStand(conf, g), 7, g), g));
+    }
+    panels.push(stTable(g.league === 'nhl' ? 'NHL' : g.league === 'nfl' ? 'NFL' : 'League', topWith(sortStand(all, g), 7, g), g));
+    return panels;
+  }
+
   // ---- Pregame panels ----
   function countdownText(g) {
     const ms = Date.parse(g.start) - Date.now();
@@ -747,9 +855,13 @@
   // the panel fits (the last 5 and the countdown always stay).
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
   window.addEventListener('resize', () => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
+  // Logos, fonts and headshots settle after the first draw: re-check the fit every few seconds.
+  setInterval(() => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers), 4000);
 
   function fitPlayers(el) {
-    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note')];
+    const panes = el.querySelectorAll ? [...el.querySelectorAll('.sd-pane')] : [];
+    if (panes.length) { panes.forEach(fitPlayers); return; }
+    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .st-row:not(.head):not(.hl)')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
@@ -760,7 +872,7 @@
 
   function middle(g) {
     if (g.state === 'pre') {
-      const pg = prePanel([pregameBoth(g), matchupBoth(g), spotlightBoth(g)]);
+      const pg = prePanel([pregameBoth(g), matchupBoth(g), spotlightBoth(g), ...standingsPanels(g, featuredTeam(featuredFollow(), g))]);
       const cd = countdownText(g) ? `<div class="countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '';
       return cd + pg;
     }
@@ -894,7 +1006,7 @@
       sd('.sd-name').textContent = g.kind === 'match' ? full.split(' ').slice(-1)[0] : (t.name || t.abbr);
     }
     sd('.sd-record').textContent = t.record || '';
-    sd('.sd-status').innerHTML = statusBar(g).replace(/^<header class="status">|<\/header>$/g, '');
+    sd('.sd-status').innerHTML = sideStatus(g);
     const won = g.state === 'post' && t.winner;
     const lost = g.state === 'post' && !t.winner && opp && opp.winner;
     sd('.sd-hero').classList.toggle('lost', !!lost);
@@ -915,7 +1027,7 @@
     sit.textContent = hasBall ? g.downDistance + (g.redZone ? ' · Red zone' : '') : '';
     let mid = '';
     if (g.state === 'pre') {
-      const pg = prePanel([pregameOne(g, t), matchupOne(g, t), spotlightOne(g, t)]);
+      const pg = prePanel([pregameOne(g, t), matchupOne(g, t), spotlightOne(g, t), ...standingsPanels(g, t)]);
       mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
@@ -924,20 +1036,21 @@
         const max = Math.max(v, o) || 1;
         return `<div class="sd-stat"><span class="l">Set ${i + 1}</span><span class="v">${v}</span><div class="bar"><i style="width:${Math.round((v / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
-    } else if ((g.stats || []).length || (g.drives && (g.drives.current || g.drives.last || g.drives.lastScore))) {
+    } else if ((g.stats || []).length || (g.drives && (g.drives.current || g.drives.last || g.drives.lastScore)) || (g.box && g.box[t.abbr])) {
       // This team's numbers; each bar is measured against the other team's.
-      const stats = '<div class="sd-stats">' + (g.stats || []).slice(0, 6).map((r) => {
+      const stats = '<div class="sd-stats">' + (g.stats || []).slice(0, 8).map((r) => {
         const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
         const max = Math.max(r.homeAmount, r.awayAmount) || 1;
         return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
           `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
-      const drive = sideDrive(g, t);
+      const drive = sideDrive(g, t) || sideBox(g, t);
       mid = drive ? `<div class="sd-panes${panelShowsDrive(g, t) ? ' show-drive' : ''}"><div class="sd-pane stats">${stats}</div><div class="sd-pane drive">${drive}</div></div>` : stats;
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
     document.body.classList.toggle('drive-on', mid.includes('sd-panes show-drive'));
-    document.body.classList.toggle('pregame', g.state === 'pre' && /class="(pg|mu|sp)/.test(mid));
+    document.body.classList.toggle('live', g.state !== 'pre');
+    document.body.classList.toggle('pregame', g.state === 'pre' && /class="(pg|mu|sp|st)"/.test(mid));
     setPlay(g.state === 'in' ? g.lastPlay : '');
     if (!tickerRunning) runTicker();
   }
@@ -1076,6 +1189,29 @@
     return `<div class="sd-drive-head${scoring ? ' score' : ''}">${esc(title)}<small>${esc(drive.description || '')}</small></div>` +
       `<div class="sd-field">${fieldSVG(g, drive, offense, defense, scoring, 800, true)}</div>` +
       (last ? `<div class="sd-drive-play">${esc(last.text)}</div>` : '');
+  }
+
+  // Top bar on the team screens: the left (away) TV shows the period and clock; the right (home)
+  // TV shows down and distance while a football game is on, the period and clock otherwise.
+  function sideStatus(g) {
+    const football = /nfl|football|cfl|ufl/.test(g.league);
+    if (sideView === 'home' && football && g.state === 'in' && g.downDistance) {
+      const off = [g.home, g.away].find((x) => x && x.id === g.possession);
+      return `<span class="when live">${esc(g.downDistance)}</span><span class="tv">${g.redZone ? '<b class="rz">Red zone</b> · ' : ''}${esc(off ? off.abbr + ' ball' : '')}</span>`;
+    }
+    return statusBar(g).replace(/^<header class="status">|<\/header>$/g, '');
+  }
+
+  // Hockey box score: this team's skaters (top scorers first) and its goalie, on its own screen.
+  function sideBox(g, t) {
+    if (/nfl|football|cfl|ufl/.test(g.league)) return '';
+    const b = g.box && g.box[t.abbr];
+    if (!b || !(b.skaters || []).length) return '';
+    const cols = [['G', 'G'], ['A', 'A'], ['PTS', 'P'], ['SOG', 'SOG'], ['PM', '+/-']].filter(([k]) => b.skaters.some((p) => p[k] != null));
+    const head = `<div class="bx-row head"><span>${esc(t.abbr)} skaters</span>${cols.map(([, l]) => `<b>${l}</b>`).join('')}</div>`;
+    const rows = b.skaters.slice(0, 12).map((p) => `<div class="bx-row"><span>${p.jersey ? `<small>${esc(p.jersey)}</small>` : ''}${esc(p.short || p.name)}</span>${cols.map(([k]) => `<b>${esc(p[k] ?? '')}</b>`).join('')}</div>`).join('');
+    const gk = (b.goalies || []).map((p) => `<div class="bx-goalie"><span>${esc(p.short || p.name)}</span><b>${esc(p.SV ?? '')}/${esc(p.SA ?? '')}</b><small>${p.SVP != null ? esc(p.SVP) + ' SV%' : ''}</small></div>`).join('');
+    return `<div class="bx">${gk ? `<div class="bx-gk">${gk}</div>` : ''}${head}${rows}</div>`;
   }
 
   // Flip the panels on the beat without waiting for new data.
