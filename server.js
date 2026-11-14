@@ -284,7 +284,8 @@ function busy() {
 }
 
 async function pollLoop() {
-  await pollOnce();
+  // One bad poll (odd data from ESPN) must never take the server, and the screens, down with it.
+  try { await pollOnce(); } catch (err) { lastFeedError = `${new Date().toISOString()} ${err.message}`; console.error('poll failed:', err.stack || err.message); }
   const wait = busy() ? config.pollSeconds : config.idlePollSeconds;
   setTimeout(pollLoop, Math.max(2, wait) * 1000);
 }
@@ -431,6 +432,10 @@ function teamColors(t) {
 }
 
 function tick() {
+  try { tickInner(); } catch (err) { console.error('tick failed:', err.stack || err.message); }
+}
+
+function tickInner() {
   const next = buffer.at(config.delaySeconds * 1000);
   if (!next || next === shown) return;
   const forward = !eventBase || Date.parse(next.at) > Date.parse(eventBase.at);
@@ -767,6 +772,10 @@ const server = http.createServer((req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' });
   return serveStatic(req, res, url.pathname);
 });
+
+// Last line of defense: log anything unexpected and keep serving the screens.
+process.on('uncaughtException', (err) => console.error('uncaught:', err.stack || err.message));
+process.on('unhandledRejection', (err) => console.error('unhandled:', (err && err.stack) || err));
 
 // Keep idle connections from timing out behind TV browsers.
 setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000);
