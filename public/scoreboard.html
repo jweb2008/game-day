@@ -206,6 +206,9 @@
   body.wide .fd-head { padding: 3vmin 5vmin 2vmin; }
   body.wide .fd-name { font-size: 7vmin; }
 
+  .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
+  .slotdots i { width: 2vmin; height: 2vmin; border-radius: 50%; background: rgba(255,255,255,.3); }
+  .slotdots i.on { background: #f5f3ee; }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -468,6 +471,8 @@
     if (wanted) return list.find(([abbr]) => abbr === wanted) || null;
     // The game picker on the dashboard, when set, beats the automatic choice.
     if (state && state.featured) { const f = list.find(([abbr]) => abbr === state.featured); if (f) return f; }
+    // Game slots from the dashboard: the server says which slot is up (live slots take turns).
+    if (state && state.slot && state.slot.key) { const f = list.find(([k]) => k === state.slot.key); if (f) return f; }
     const by = (s) => list.filter(([, g]) => g.state === s);
     const live = by('in');
     if (live.length) return live[0];
@@ -578,7 +583,10 @@
       const d = new Date(g.start);
       when = `<span class="when">${d.toLocaleDateString(undefined, { weekday: 'short', timeZone: tz() })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}</span>`;
     }
-    return `<header class="status">${when}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
+    // When live slots are taking turns: a dot per live game, the one on screen filled.
+    const sl = state && state.slot;
+    const dots = sl && sl.live > 1 ? `<span class="slotdots">${Array.from({ length: sl.live }, (_, i) => `<i class="${i === sl.turn ? 'on' : ''}"></i>`).join('')}</span>` : '';
+    return `<header class="status">${when}${dots}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
   }
 
   // ---- Pregame panels ----

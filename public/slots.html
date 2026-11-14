@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game slots</title>
+<style>
+  :root { --bg: #111318; --card: #1b1e25; --line: #2b303b; --text: #e8edf5; --muted: #8b97ab; --accent: #03a9f4; --live: #ff6b6b; --good: #3fbf7f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 12px; }
+  .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .top h1 { font-size: 17px; margin: 0; flex: 1; }
+  .top label { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  select, button { font: inherit; color: var(--text); background: #252a33; border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+  button:disabled { opacity: .35; cursor: default; }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .note a { color: #8cc8ff; }
+  .slot { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; margin-bottom: 8px; }
+  .slot.now { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+  .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #252a33; font-weight: 700; color: var(--muted); }
+  .slot.now .num { background: var(--accent); color: #fff; }
+  .g { min-width: 0; }
+  .teams { display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .teams img { width: 22px; height: 22px; object-fit: contain; flex: none; }
+  .teams .sc { font-variant-numeric: tabular-nums; }
+  .teams .at { color: var(--muted); font-weight: 400; }
+  .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  .pill { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #2c323d; color: var(--muted); }
+  .pill.live { background: rgba(255,107,107,.18); color: var(--live); }
+  .pill.now { background: rgba(3,169,244,.18); color: #6cc8ff; }
+  .pill.off { background: rgba(255,200,0,.12); color: #e6c35c; }
+  .acts { display: flex; gap: 4px; }
+  .acts button { padding: 4px 8px; }
+  .empty { color: var(--muted); }
+  .pick { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .pick button.cand { text-align: left; display: flex; flex-direction: column; gap: 1px; background: #20242c; }
+  .pick .none { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <h1>Game slots</h1>
+    <label>Rotate live games every
+      <select id="cycle">
+        <option value="1">1 min</option><option value="2">2 min</option><option value="3">3 min</option>
+        <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option>
+      </select>
+    </label>
+  </div>
+  <p class="note">Slot 1 is your top priority. Live games take turns on the screens; with none live, the highest slot with a game coming up shows. Lights and sounds fire for every game in a slot. <a href="/calendar.html" target="_blank">Find more games on the calendar</a></p>
+  <div id="list"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const TZ = 'America/Denver';
+  let data = null;
+  let picking = null; // slot index with the "add a game" list open
+
+  const when = (g) => {
+    if (g.state === 'in') return `<span class="pill live">LIVE</span><span>${esc(g.detail)}</span>`;
+    if (g.state === 'post') return `<span>${esc(g.detail || 'Final')}</span>`;
+    if (g.state === 'pre' && g.start) return `<span>${esc(new Date(g.start).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: TZ }))}</span>`;
+    return `<span>${esc(g.detail || '')}</span>`;
+  };
+
+  function gameHTML(g) {
+    let teams;
+    if (g.away && g.home) {
+      const side = (t) => `${t.logo ? `<img src="${esc(t.logo)}" alt="" onerror="this.remove()">` : ''}${esc(t.abbr || t.name)}${g.state !== 'pre' && t.score != null ? ` <span class="sc">${t.score}</span>` : ''}`;
+      teams = `${side(g.away)} <span class="at">at</span> ${side(g.home)}`;
+    } else teams = esc(g.name || g.label);
+    return `<div class="teams">${teams}</div><div class="meta">${when(g)}<span>${esc(g.label)}</span>${g.following === false ? '<span class="pill off">Follow switch off</span>' : ''}</div>`;
+  }
+
+  function render() {
+    $('cycle').value = String(data.cycleMinutes);
+    $('list').innerHTML = data.slots.map((g, i) => {
+      const now = g && data.showing === g.key && !data.featured;
+      const acts = g
+        ? `<button data-up="${i}" ${i === 0 ? 'disabled' : ''} title="Higher priority">▲</button><button data-down="${i}" ${i === data.slots.length - 1 ? 'disabled' : ''} title="Lower priority">▼</button><button data-clear="${i}" title="Empty this slot">✕</button>`
+        : `<button data-pick="${i}">${picking === i ? 'Cancel' : 'Add'}</button>`;
+      let pick = '';
+      if (picking === i) {
+        pick = `<div class="pick">${data.candidates.length
+          ? data.candidates.map((c) => `<button class="cand" data-put="${esc(c.key)}">${gameHTML(c)}</button>`).join('')
+          : '<span class="none">Every game you follow or picked is already in a slot. Pick more on the calendar.</span>'}</div>`;
+      }
+      return `<div class="slot${now ? ' now' : ''}"><span class="num">${i + 1}</span>
+        <div class="g">${g ? gameHTML(g) + (now ? '<div class="meta"><span class="pill now">ON THE SCREENS</span></div>' : '') : '<span class="empty">Empty</span>'}</div>
+        <div class="acts">${acts}</div>${pick}</div>`;
+    }).join('') + (data.featured ? `<p class="note">The dashboard's Featured game is set, so the screens stay on it. Set it back to Auto for the slots to run the screens.</p>` : '');
+  }
+
+  async function load() {
+    try { data = await (await fetch('/api/slots')).json(); render(); } catch {}
+  }
+
+  async function save(list) {
+    await fetch(`/api/slots?set=${encodeURIComponent(list.map((k) => k || '').join(','))}`, { method: 'POST' });
+    picking = null;
+    load();
+  }
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    const keys = data.slots.map((g) => (g ? g.key : null));
+    const d = b.dataset;
+    if (d.up) { const i = +d.up; [keys[i - 1], keys[i]] = [keys[i], keys[i - 1]]; save(keys); }
+    else if (d.down) { const i = +d.down; [keys[i + 1], keys[i]] = [keys[i], keys[i + 1]]; save(keys); }
+    else if (d.clear) { keys[+d.clear] = null; save(keys); }
+    else if (d.pick) { picking = picking === +d.pick ? null : +d.pick; render(); }
+    else if (d.put) { keys[picking] = d.put; save(keys); }
+  });
+  $('cycle').addEventListener('change', async () => { await fetch(`/api/slots?cycle=${$('cycle').value}`, { method: 'POST' }); load(); });
+
+  load();
+  setInterval(() => { if (picking === null) load(); }, 15000);
+</script>
+</body>
+</html>

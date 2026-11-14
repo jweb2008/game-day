@@ -359,14 +359,48 @@ function followedGames(games) {
   return Object.fromEntries(Object.entries(games || {}).filter(([abbr]) => following(abbr)));
 }
 
+// ---- Game slots -----------------------------------------------------------
+// Six slots in priority order, each holding one of your teams (its current or next game) or a
+// calendar pick (G<id>). Live slots take turns on the screens every few minutes; with none live
+// the highest slot with a game coming up shows, then the highest with a final. Empty slots: the
+// screens choose on their own, as before.
+const SLOT_COUNT = 6;
+const slots = () => {
+  const list = Array.isArray(config.slots) ? config.slots.slice(0, SLOT_COUNT) : [];
+  while (list.length < SLOT_COUNT) list.push(null);
+  return list;
+};
+const slotCycleMs = () => Math.max(1, Number(config.slotCycleMinutes) || 5) * 60 * 1000;
+
+function slotPick(games) {
+  const filled = slots().filter((k) => k && games[k]);
+  if (!filled.length) return null;
+  const live = filled.filter((k) => games[k].state === 'in');
+  if (live.length) {
+    const turn = Math.floor(Date.now() / slotCycleMs()) % live.length;
+    return { key: live[turn], live: live.length, turn, nextAt: (Math.floor(Date.now() / slotCycleMs()) + 1) * slotCycleMs() };
+  }
+  const soon = filled.find((k) => games[k].state === 'pre');
+  const final = filled.find((k) => games[k].state === 'post');
+  return { key: soon || final || filled[0], live: 0 };
+}
+
+function saveSlots(list) {
+  config.slots = list.slice(0, SLOT_COUNT).map((k) => k || null);
+  saveLocal({ slots: config.slots });
+  broadcast('state', screenState());
+}
+
 function screenState() {
+  const games = shown ? followedGames(shown.games) : {};
   return {
     delaySeconds: config.delaySeconds,
     timeZone: config.timeZone || null,
     buffering: shown === null,
     at: shown ? shown.at : null,
-    games: shown ? followedGames(shown.games) : {},
+    games,
     featured: featured(),
+    slot: slotPick(games),
     ticker: shown ? shown.ticker || [] : [],
   };
 }
@@ -630,6 +664,9 @@ const server = http.createServer((req, res) => {
         ? { id, league: lg, date, kind: 'field', start: g.start, end: g.end, cheer: 'none', label: g.name }
         : { id, league: lg, date, kind: g.kind || 'team', start: g.start, cheer, label: g.event ? `${g.event}: ${g.away.fullName || g.away.name} vs ${g.home.fullName || g.home.name}` : g.name, away: brief(g.away), home: brief(g.home) };
       config.watch = [...watchList().filter((w) => String(w.id) !== id), entry].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+      // A new pick goes into the first empty slot, if there is one.
+      const list = slots();
+      if (!list.includes(`G${id}`)) { const free = list.indexOf(null); if (free >= 0) { list[free] = `G${id}`; saveSlots(list); } }
       saveLocal({ watch: config.watch });
       json(res, 200, config.watch);
     }).catch((err) => json(res, 502, { error: err.message }));
@@ -639,8 +676,51 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/watch' && req.method === 'DELETE') {
     const id = String(url.searchParams.get('id') || '');
     config.watch = watchList().filter((w) => String(w.id) !== id);
+    if (slots().includes(`G${id}`)) saveSlots(slots().map((k) => (k === `G${id}` ? null : k)));
     saveLocal({ watch: config.watch });
     return json(res, 200, config.watch);
+  }
+
+  // Game slots: what's in each, what can go in one, and which is on the screens now.
+  if (url.pathname === '/api/slots' && req.method === 'GET') {
+    const games = live.games || {};
+    const watch = watchList();
+    const describe = (key) => {
+      if (!key) return null;
+      const g = games[key];
+      const team = config.teams.find((t) => t.abbr === key);
+      const w = key.startsWith('G') ? watch.find((x) => `G${x.id}` === key) : null;
+      const label = team ? `${team.name} (your team)` : w ? `${(leagueInfo(w.league) || {}).name || w.league} · calendar pick` : key;
+      if (g) {
+        return { key, label, state: g.state, start: g.start, detail: g.detail, kind: g.kind || 'team', name: g.name,
+          away: g.away ? { ...brief(g.away), score: g.away.score } : null, home: g.home ? { ...brief(g.home), score: g.home.score } : null,
+          following: following(key) };
+      }
+      if (w) return { key, label, state: 'pre', start: w.start, detail: '', kind: w.kind || 'team', name: w.label, away: w.away, home: w.home, following: true };
+      return { key, label, state: 'none', detail: team ? 'No game found' : 'Ended', following: following(key) };
+    };
+    const list = slots();
+    const candidates = [...config.teams.map((t) => t.abbr), ...watch.map((w) => `G${w.id}`)].filter((k) => !list.includes(k)).map(describe);
+    return json(res, 200, {
+      slots: list.map(describe), candidates, cycleMinutes: Math.max(1, Number(config.slotCycleMinutes) || 5),
+      showing: (slotPick(shown ? followedGames(shown.games) : {}) || {}).key || null, featured: featured(),
+    });
+  }
+
+  if (url.pathname === '/api/slots' && req.method === 'POST') {
+    if (url.searchParams.has('cycle')) {
+      const m = Number(url.searchParams.get('cycle'));
+      if (!(m >= 1 && m <= 60)) return json(res, 400, { error: 'cycle must be 1 to 60 minutes' });
+      config.slotCycleMinutes = m;
+      saveLocal({ slotCycleMinutes: m });
+      broadcast('state', screenState());
+    }
+    if (url.searchParams.has('set')) {
+      const valid = new Set([...config.teams.map((t) => t.abbr), ...watchList().map((w) => `G${w.id}`)]);
+      const list = String(url.searchParams.get('set')).split(',').map((k) => (valid.has(k) ? k : null));
+      saveSlots(list.map((k, i) => (k && list.indexOf(k) === i ? k : null)).concat(Array(SLOT_COUNT).fill(null)).slice(0, SLOT_COUNT));
+    }
+    return json(res, 200, { slots: slots(), cycleMinutes: Math.max(1, Number(config.slotCycleMinutes) || 5) });
   }
 
   if (url.pathname === '/api/follow' && req.method === 'POST') {

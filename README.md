@@ -29,6 +29,8 @@ bash /opt/game-day/update.sh
 | `GET /api/leagues`, `GET /api/calendar?league=nfl&date=20261115`, `GET/POST/DELETE /api/watch` | Calendar data and the watch list (saved in `config.local.json`) |
 | `/scoreboard.html?view=field` | Field view for a wide screen (football): the drive on a field, line of scrimmage, first-down line, last play with headshots; the scoring drive for a minute after a score. Other sports and pregame show the logo page |
 | `/api/debug/summary?game=<id>` | What the app read from ESPN's game summary (`&raw=1` for the raw JSON), for troubleshooting |
+| `/slots.html` | Game slots, for a Webpage card on the Home Assistant dashboard: six slots in priority order holding your teams or calendar picks. Live slots take turns on the screens (every 5 min by default); with none live, the highest slot with a game coming up shows. Calendar picks fill the first empty slot. The dashboard's Featured game, when set, still wins |
+| `GET /api/slots`, `POST /api/slots?set=BOS,KC,,NE` / `?cycle=5` | Slot contents and the rotation time (saved in `config.local.json`) |
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
 | `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`); Home Assistant's delay slider calls this |
