@@ -35,19 +35,24 @@
   .pick { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
   .pick button.cand { text-align: left; display: flex; flex-direction: column; gap: 1px; background: #20242c; }
   .pick .none { color: var(--muted); font-size: 13px; }
+  .pinbar { display: flex; align-items: center; gap: 10px; background: rgba(255,209,102,.12); border: 1px solid #ffd166; border-radius: 12px; padding: 9px 10px; margin-bottom: 10px; }
+  .pinbar .g { flex: 1; }
+  .pinbar b { color: #ffd166; font-size: 12px; letter-spacing: .08em; }
+  button.show { color: #ffd166; border-color: #6b5a26; }
 </style>
 </head>
 <body>
   <div class="top">
     <h1>Game slots</h1>
-    <label>Rotate live games every
+    <label>During breaks, rotate every
       <select id="cycle">
         <option value="1">1 min</option><option value="2">2 min</option><option value="3">3 min</option>
         <option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option>
       </select>
     </label>
   </div>
-  <p class="note">Slot 1 is your top priority. Live games take turns on the screens; with none live, the highest slot with a game coming up shows. Lights and sounds fire for every game in a slot. <a href="/calendar.html" target="_blank">Find more games on the calendar</a></p>
+  <div id="pin"></div>
+  <p class="note">Slot 1 is your top priority. The highest live slot stays on the screens; the other live games only show while it's at halftime, an intermission or the end of a period, taking turns at the time below. With nothing live, the highest slot with a game coming up shows. Lights and sounds fire for every game in a slot. <b>Show now</b> puts a game up and holds it until you tap Back to automatic. <a href="/calendar.html" target="_blank">Find more games on the calendar</a></p>
   <div id="list"></div>
 
 <script>
@@ -75,10 +80,12 @@
 
   function render() {
     $('cycle').value = String(data.cycleMinutes);
+    $('pin').innerHTML = data.pinned
+      ? `<div class="pinbar"><div class="g"><b>ON THE SCREENS NOW (HELD)</b>${gameHTML(data.pinned)}</div><button data-unpin="1">Back to automatic</button></div>` : '';
     $('list').innerHTML = data.slots.map((g, i) => {
-      const now = g && data.showing === g.key && !data.featured;
+      const now = g && data.showing === g.key && (!data.featured || data.pin);
       const acts = g
-        ? `<button data-up="${i}" ${i === 0 ? 'disabled' : ''} title="Higher priority">▲</button><button data-down="${i}" ${i === data.slots.length - 1 ? 'disabled' : ''} title="Lower priority">▼</button><button data-clear="${i}" title="Empty this slot">✕</button>`
+        ? `${g.state === 'none' ? '' : `<button class="show" data-show="${esc(g.key)}" title="Put this game on the screens now">Show now</button>`}<button data-up="${i}" ${i === 0 ? 'disabled' : ''} title="Higher priority">▲</button><button data-down="${i}" ${i === data.slots.length - 1 ? 'disabled' : ''} title="Lower priority">▼</button><button data-clear="${i}" title="Empty this slot">✕</button>`
         : `<button data-pick="${i}">${picking === i ? 'Cancel' : 'Add'}</button>`;
       let pick = '';
       if (picking === i) {
@@ -89,7 +96,7 @@
       return `<div class="slot${now ? ' now' : ''}"><span class="num">${i + 1}</span>
         <div class="g">${g ? gameHTML(g) + (now ? '<div class="meta"><span class="pill now">ON THE SCREENS</span></div>' : '') : '<span class="empty">Empty</span>'}</div>
         <div class="acts">${acts}</div>${pick}</div>`;
-    }).join('') + (data.featured ? `<p class="note">The dashboard's Featured game is set, so the screens stay on it. Set it back to Auto for the slots to run the screens.</p>` : '');
+    }).join('') + (data.featured && !data.pin ? `<p class="note">The dashboard's Featured game is set, so the screens stay on it. Set it back to Auto for the slots to run the screens.</p>` : '');
   }
 
   async function load() {
@@ -112,6 +119,8 @@
     else if (d.clear) { keys[+d.clear] = null; save(keys); }
     else if (d.pick) { picking = picking === +d.pick ? null : +d.pick; render(); }
     else if (d.put) { keys[picking] = d.put; save(keys); }
+    else if (d.show) { fetch(`/api/slots?pin=${encodeURIComponent(d.show)}`, { method: 'POST' }).then(load); }
+    else if (d.unpin) { fetch('/api/slots?pin=', { method: 'POST' }).then(load); }
   });
   $('cycle').addEventListener('change', async () => { await fetch(`/api/slots?cycle=${$('cycle').value}`, { method: 'POST' }); load(); });
 

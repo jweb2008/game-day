@@ -416,13 +416,26 @@ const slots = () => {
 };
 const slotCycleMs = () => Math.max(1, Number(config.slotCycleMinutes) || 5) * 60 * 1000;
 
+// A game at a stoppage long enough to look elsewhere: halftime, an intermission, the end of a period.
+function onBreak(g) {
+  return /STATUS_HALFTIME|STATUS_END_PERIOD|INTERMISSION/i.test(g.statusName || '') || /halftime|intermission|^end\b|end of/i.test(g.detail || '');
+}
+
 function slotPick(games) {
+  // "Show now" from the dashboard holds one game until it's cleared.
+  if (config.pin && games[config.pin]) return { key: config.pin, pinned: true, live: 0 };
   const filled = slots().filter((k) => k && games[k]);
   if (!filled.length) return null;
   const live = filled.filter((k) => games[k].state === 'in');
   if (live.length) {
-    const turn = Math.floor(Date.now() / slotCycleMs()) % live.length;
-    return { key: live[turn], live: live.length, turn, nextAt: (Math.floor(Date.now() / slotCycleMs()) + 1) * slotCycleMs() };
+    // The main game (highest live slot) stays up. Only while it's on a break do the other live
+    // games take turns, every few minutes; when play resumes the screens go straight back.
+    const main = live[0];
+    if (!onBreak(games[main])) return { key: main, live: live.length, turn: 0, mode: 'main' };
+    const others = live.slice(1).filter((k) => !onBreak(games[k]));
+    if (!others.length) return { key: main, live: live.length, turn: 0, mode: 'main' };
+    const turn = Math.floor(Date.now() / slotCycleMs()) % others.length;
+    return { key: others[turn], live: live.length, turn: live.indexOf(others[turn]), mode: 'break', main };
   }
   const soon = filled.find((k) => games[k].state === 'pre');
   const final = filled.find((k) => games[k].state === 'post');
@@ -496,6 +509,16 @@ function tickInner() {
         if (abbr.startsWith('G')) event.label = game.name;
         publish(event);
       }
+    }
+  }
+  // Score alerts for the ticker: any other game whose score went up since the last snapshot.
+  if (eventBase && forward) {
+    const before = new Map((eventBase.ticker || []).map((t) => [t.id, t]));
+    for (const t of next.ticker || []) {
+      const b = before.get(t.id);
+      if (!b || !b.away || !b.home || !t.away || !t.home) continue;
+      const da = t.away.score - b.away.score, dh = t.home.score - b.home.score;
+      if (da > 0 || dh > 0) broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: da > 0 ? t.away.abbr : t.home.abbr });
     }
   }
   if (forward) eventBase = next;
@@ -752,6 +775,9 @@ const server = http.createServer((req, res) => {
     return json(res, 200, {
       slots: list.map(describe), candidates, cycleMinutes: Math.max(1, Number(config.slotCycleMinutes) || 5),
       showing: (slotPick(shown ? followedGames(shown.games) : {}) || {}).key || null, featured: featured(),
+      pin: config.pin && (live.games || {})[config.pin] ? config.pin : null,
+      pinned: config.pin ? describe(config.pin) : null,
+      breakMode: (slotPick(shown ? followedGames(shown.games) : {}) || {}).mode === 'break',
     });
   }
 
@@ -761,6 +787,12 @@ const server = http.createServer((req, res) => {
       if (!(m >= 1 && m <= 60)) return json(res, 400, { error: 'cycle must be 1 to 60 minutes' });
       config.slotCycleMinutes = m;
       saveLocal({ slotCycleMinutes: m });
+      broadcast('state', screenState());
+    }
+    if (url.searchParams.has('pin')) {
+      const k = String(url.searchParams.get('pin') || '');
+      config.pin = k && (live.games || {})[k] ? k : null;
+      saveLocal({ pin: config.pin });
       broadcast('state', screenState());
     }
     if (url.searchParams.has('set')) {

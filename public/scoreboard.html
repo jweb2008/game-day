@@ -206,6 +206,16 @@
   body.wide .fd-head { padding: 3vmin 5vmin 2vmin; }
   body.wide .fd-name { font-size: 7vmin; }
 
+  .slotnote { font-size: 3.6vmin; font-weight: 700; color: #111; background: #ffd166; padding: .6vmin 1.6vmin; border-radius: 1vmin; margin: 0 2vmin; white-space: nowrap; }
+  .tickalert { position: absolute; left: 0; right: 0; bottom: 0; height: 11.2vmin; z-index: 8; display: flex; align-items: center; gap: 3vmin;
+    padding: 0 4vmin; background: #ffd166; color: #111; font-weight: 800; font-size: 5.4vmin; white-space: nowrap; overflow: hidden;
+    animation: alert-in .35s ease-out both; }
+  .tickalert[hidden] { display: none; }
+  .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #111; color: #ffd166; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
+  .tickalert .sc { font-variant-numeric: tabular-nums; }
+  .tickalert .dim { opacity: .55; }
+  .tickalert small { font-size: 3.8vmin; font-weight: 600; opacity: .75; }
+  @keyframes alert-in { from { transform: translateY(100%); } }
   .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
   .slotdots i { width: 2vmin; height: 2vmin; border-radius: 50%; background: rgba(255,255,255,.3); }
   .slotdots i.on { background: #f5f3ee; }
@@ -502,6 +512,7 @@
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
   <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="bug"></div></div>
+  <div id="tickalert" class="tickalert" hidden></div>
   <div id="banner" class="banner" hidden></div>
   <div id="takeover" class="tko" hidden></div>
 </div>
@@ -542,6 +553,8 @@
     const list = Object.entries(games);
     if (wanted) return list.find(([abbr]) => abbr === wanted) || null;
     // The game picker on the dashboard, when set, beats the automatic choice.
+    // "Show now" from the dashboard beats everything else.
+    if (state && state.slot && state.slot.pinned) { const f = list.find(([k]) => k === state.slot.key); if (f) return f; }
     if (state && state.featured) { const f = list.find(([abbr]) => abbr === state.featured); if (f) return f; }
     // Game slots from the dashboard: the server says which slot is up (live slots take turns).
     if (state && state.slot && state.slot.key) { const f = list.find(([k]) => k === state.slot.key); if (f) return f; }
@@ -657,7 +670,8 @@
     }
     // When live slots are taking turns: a dot per live game, the one on screen filled.
     const sl = state && state.slot;
-    const dots = sl && sl.live > 1 ? `<span class="slotdots">${Array.from({ length: sl.live }, (_, i) => `<i class="${i === sl.turn ? 'on' : ''}"></i>`).join('')}</span>` : '';
+    // While the main game is on a break and another game fills in, say so.
+    const dots = sl && sl.mode === 'break' ? `<span class="slotnote">Main game on break</span>` : '';
     return `<header class="status">${when}${dots}<span class="tv">${esc(g.broadcast || '')}</span></header>`;
   }
 
@@ -1502,12 +1516,34 @@
     if (ev.type === 'final' && ev.winner && cheer.includes(ev.winner)) startTakeover({ moment: 'win', follow: ev.follow, team: ev.winner });
   }
 
+  // ---- Score alerts on the ticker: another game's score changed ----
+  const alertEl = document.getElementById('tickalert');
+  const alerts = [];
+  let alertBusy = false;
+  function scoreAlert(a) {
+    if (logoView || a.id === featuredId) return; // the game on screen has its own takeovers
+    alerts.push(a);
+    if (alerts.length > 6) alerts.shift();
+    if (!alertBusy) nextAlert();
+  }
+  function nextAlert() {
+    const a = alerts.shift();
+    if (!a) { alertBusy = false; alertEl.hidden = true; return; }
+    alertBusy = true;
+    const side = (t) => `<span class="sc${t.abbr === a.scorer ? '' : ' dim'}">${esc(t.abbr)} ${t.score}</span>`;
+    alertEl.innerHTML = `<span class="tag">SCORE</span>${side(a.away)}${side(a.home)}<small>${esc(a.detail || '')}</small>`;
+    alertEl.hidden = false;
+    alertEl.style.animation = 'none'; void alertEl.offsetWidth; alertEl.style.animation = '';
+    setTimeout(nextAlert, 8000);
+  }
+
   function connect() {
     const es = new EventSource('/stream');
     es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
     es.addEventListener('media', (e) => { media = JSON.parse(e.data); lpTeam = null; sdKey = null; render(); });
     // The new score reaches the screen right after its event; wait a beat so the takeover shows it.
     es.addEventListener('game', (e) => { const ev = JSON.parse(e.data); setTimeout(() => onGameEvent(ev), 150); });
+    es.addEventListener('alert', (e) => scoreAlert(JSON.parse(e.data)));
     es.onopen = () => { online = true; };
     es.onerror = () => { online = false; render(); };
   }
