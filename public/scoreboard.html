@@ -41,12 +41,12 @@
     padding: 4vmin 5vmin 3vmin;
     font-size: 6.5vmin; line-height: 1;
   }
-  .status .when { font-weight: 800; }
+  .status .when { font-weight: 800; white-space: nowrap; flex: none; }
   .status .live::before {
     content: ''; display: inline-block; width: 2.6vmin; height: 2.6vmin; border-radius: 50%;
     background: #ff4d4d; margin-right: 2vmin; vertical-align: 0.6vmin;
   }
-  .status .tv { color: var(--muted); font-size: 5vmin; }
+  .status .tv { color: var(--muted); font-size: 5vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin-left: 4vmin; text-align: right; }
 
   .team {
     position: relative;
@@ -137,7 +137,7 @@
     body { transition: none; }
     .score.scored { animation: none; }
   }
-  #rest { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #rest { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
 
   /* ---- Team screen (?side=away or ?side=home): one team per TV, like the two benches ---- */
@@ -269,7 +269,8 @@
   /* Pregame with form and players to watch: a smaller logo so all the player cards fit. */
   body.side.pregame .sd-logo { width: 22vmin; height: 22vmin; margin: 1vmin 0 1.5vmin; }
   body.side.pregame .sd-hero { padding-bottom: 6vmin; }
-  body.side.pregame .sd-score-row, body.side.pregame #play { display: none; }
+  body.side.pregame .sd-score-row, body.side.pregame #play, body.side.pregame .sd-tag { display: none; }
+  body.side.pregame .sd-countdown.slim .big { font-size: 10.5vmin; }
   .sd-drive-head { margin: 3vmin 5vmin 0; font-size: 5.6vmin; font-weight: 800; color: #f5f3ee; letter-spacing: .04em; text-transform: uppercase; }
   .sd-drive-head small { display: block; font-size: 4vmin; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; margin-top: .6vmin; }
   .sd-drive-head.score { color: #ffd166; }
@@ -641,6 +642,22 @@
     if (el._tpl === html) { const b = el.querySelector('.cd-big'); if (b && cd) b.textContent = cd; return; }
     el._tpl = html;
     el.innerHTML = html.replace('{CD}', esc(cd || ''));
+    requestAnimationFrame(() => fitPlayers(el));
+  }
+
+  // Whatever the screen, never show a card cut in half: drop player cards from the bottom until
+  // the panel fits (the last 5 and the countdown always stay).
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
+  window.addEventListener('resize', () => document.querySelectorAll('#rest, #side .sd-mid').forEach(fitPlayers));
+
+  function fitPlayers(el) {
+    const cards = [...el.querySelectorAll('.pg-player')];
+    if (!cards.length) return;
+    cards.forEach((c) => { c.style.display = ''; });
+    const over = () => el.scrollHeight > el.clientHeight + 1;
+    while (over() && cards.length) cards.pop().style.display = 'none';
+    const head = el.querySelector('.pg h4:last-of-type');
+    if (head) head.style.display = el.querySelector('.pg-player:not([style*="none"])') ? '' : 'none';
   }
 
   function middle(g) {
