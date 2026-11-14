@@ -279,6 +279,11 @@
     background: radial-gradient(ellipse at 50% 42%, var(--lp1) 0%, var(--lp2) 62%, #05070b 100%);
     transition: background 1.5s ease; overflow: hidden;
   }
+  /* Projector: pure black (a projector shows black as no light at all), so only the logo lands on the ceiling.
+     ?glow=1 brings back the team-color glow and light sweep; ?size=70 sets the logo size (share of the image height). */
+  body.wide:not(.glow), body.wide:not(.glow) #logo-page { background: #000 !important; }
+  body.wide:not(.glow) .lp-sweep, body.wide:not(.glow) .lp-shadow { display: none; }
+  body.wide:not(.glow) .lp-logo { width: var(--lp-size, 92vmin); height: var(--lp-size, 92vmin); filter: none; }
   .lp-sweep {
     position: absolute; inset: -20% -60%;
     background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.10) 50%, transparent 58%);
@@ -442,6 +447,8 @@
   const sideView = ['home', 'away'].includes((params.get('side') || '').toLowerCase()) ? params.get('side').toLowerCase() : null;
   document.body.classList.toggle('side', !!sideView);
   document.body.classList.toggle('wide', logoView);
+  document.body.classList.toggle('glow', params.get('glow') === '1');
+  if (Number(params.get('size')) > 0) document.documentElement.style.setProperty('--lp-size', `${Math.min(100, Number(params.get('size')))}vmin`);
   function applyTurn() {
     const turn = (params.get('turn') || (logoView ? 'none' : '')).toLowerCase(); // logoView includes the field view
     const landscape = window.innerWidth > window.innerHeight;
