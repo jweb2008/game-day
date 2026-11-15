@@ -445,11 +445,11 @@ function followedGames(games) {
 }
 
 // ---- Game slots -----------------------------------------------------------
-// Six slots in priority order, each holding one of your teams (its current or next game) or a
+// Fifteen slots in priority order, each holding one of your teams (its current or next game) or a
 // calendar pick (G<id>). Live slots take turns on the screens every few minutes; with none live
 // the highest slot with a game coming up shows, then the highest with a final. Empty slots: the
 // screens choose on their own, as before.
-const SLOT_COUNT = 6;
+const SLOT_COUNT = 15;
 const slots = () => {
   const list = Array.isArray(config.slots) ? config.slots.slice(0, SLOT_COUNT) : [];
   while (list.length < SLOT_COUNT) list.push(null);

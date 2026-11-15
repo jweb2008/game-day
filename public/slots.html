@@ -16,6 +16,10 @@
   .note { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
   .note a { color: #8cc8ff; }
   .slot { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; margin-bottom: 8px; }
+  /* Empty slots stay slim so fifteen fit without much scrolling. */
+  .slot.empty-slot { padding: 4px 10px; }
+  .slot.empty-slot .num { width: 22px; height: 22px; font-size: 12px; }
+  .slot.empty-slot .acts button { padding: 2px 8px; font-size: 13px; }
   .slot.now { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
   .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #252a33; font-weight: 700; color: var(--muted); }
   .slot.now .num { background: var(--accent); color: #fff; }
@@ -93,7 +97,7 @@
           ? data.candidates.map((c) => `<button class="cand" data-put="${esc(c.key)}">${gameHTML(c)}</button>`).join('')
           : '<span class="none">Every game you follow or picked is already in a slot. Pick more on the calendar.</span>'}</div>`;
       }
-      return `<div class="slot${now ? ' now' : ''}"><span class="num">${i + 1}</span>
+      return `<div class="slot${now ? ' now' : ''}${!g && picking !== i ? ' empty-slot' : ''}"><span class="num">${i + 1}</span>
         <div class="g">${g ? gameHTML(g) + (now ? '<div class="meta"><span class="pill now">ON THE SCREENS</span></div>' : '') : '<span class="empty">Empty</span>'}</div>
         <div class="acts">${acts}</div>${pick}</div>`;
     }).join('') + (data.featured && !data.pin ? `<p class="note">The dashboard's Featured game is set, so the screens stay on it. Set it back to Auto for the slots to run the screens.</p>` : '');
