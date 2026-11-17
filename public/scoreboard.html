@@ -260,6 +260,8 @@
   .bx-row.head { font-size: 3.6vmin; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .bx-row.head b { font-weight: 600; }
   .bx-gk { margin-bottom: 1.8vmin; }
+  .bx-row.dnp { opacity: .5; }
+  .bx-row .dnp-note { grid-column: 2 / -1; text-align: right; font-weight: 600; color: var(--muted); }
   .bx-goalie { display: flex; align-items: baseline; gap: 2.4vmin; font-size: 4.8vmin; padding: 1.2vmin 2vmin; background: rgba(255,255,255,.06); border-left: 1.2vmin solid var(--sd-band-bright); }
   .bx-goalie span { font-weight: 800; flex: 1; }
   .bx-goalie b { font-variant-numeric: tabular-nums; }
@@ -1291,12 +1293,24 @@
     if (/nfl|football|cfl|ufl/.test(g.league)) return '';
     const b = g.box && g.box[t.abbr];
     if (!b || !(b.skaters || []).length) return '';
-    const cols = [['G', 'G'], ['A', 'A'], ['PTS', 'P'], ['SOG', 'SOG'], ['PM', '+/-']].filter(([k]) => b.skaters.some((p) => p[k] != null));
-    const head = `<div class="bx-row head"><span>${esc(t.abbr)} skaters</span>${cols.map(([, l]) => `<b>${l}</b>`).join('')}</div>`;
-    const rows = b.skaters.slice(0, 12).map((p) => `<div class="bx-row"><span>${p.jersey ? `<small>${esc(p.jersey)}</small>` : ''}${esc(p.short || p.name)}</span>${cols.map(([k]) => `<b>${esc(p[k] ?? '')}</b>`).join('')}</div>`).join('');
+    const hockey = /hockey|nhl/.test(g.league), hoops = /basketball|nba|wnba|nba-development/.test(g.league), baseball = /baseball|mlb|softball/.test(g.league);
+    // Each sport's own columns, read by ESPN's column label.
+    const COLS = hockey ? [['G', 'G'], ['A', 'A'], ['PTS', 'P'], ['SOG', 'SOG'], ['+/-', '+/-']]
+      : hoops ? [['PTS', 'PTS'], ['REB', 'REB'], ['AST', 'AST'], ['FG', 'FG'], ['+/-', '+/-']]
+      : baseball ? [['AB', 'AB'], ['R', 'R'], ['H', 'H'], ['RBI', 'RBI'], ['HR', 'HR']]
+      : [];
+    const val = (p, l) => (p.s && p.s[l] != null ? p.s[l] : l === 'SOG' ? p.SOG : l === 'PTS' ? p.PTS : l === '+/-' ? p.PM : p[l]);
+    const cols = COLS.filter(([l]) => b.skaters.some((p) => val(p, l) != null && val(p, l) !== ''));
+    const title = hockey ? 'skaters' : baseball ? 'batting' : 'players';
+    const head = `<div class="bx-row head"><span>${esc(t.abbr)} ${title}</span>${cols.map(([, h]) => `<b>${h}</b>`).join('')}</div>`;
+    const rows = b.skaters.slice(0, 14).map((p) => `<div class="bx-row${p.dnp ? ' dnp' : ''}"><span>${p.jersey ? `<small>${esc(p.jersey)}</small>` : ''}${esc(p.short || p.name)}</span>` +
+      (p.dnp ? `<b class="dnp-note">DNP</b>` : cols.map(([l]) => `<b>${esc(val(p, l) ?? '')}</b>`).join('')) + '</div>').join('');
     const gk = (b.goalies || []).map((p) => `<div class="bx-goalie"><span>${esc(p.short || p.name)}</span><b>${esc(p.SV ?? '')}/${esc(p.SA ?? '')}</b><small>${p.SVP != null ? esc(p.SVP) + ' SV%' : ''}</small></div>`).join('');
-    return `<div class="bx">${gk ? `<div class="bx-gk">${gk}</div>` : ''}${head}${rows}</div>`;
+    const pit = (b.pitchers || []).filter((p) => !p.dnp).map((p) => `<div class="bx-goalie"><span>${esc(p.short || p.name)}</span><b>${esc(p.s.IP ?? '')} IP</b><small>${esc([p.s.H != null && `${p.s.H} H`, p.s.ER != null && `${p.s.ER} ER`, p.s.K != null && `${p.s.K} K`].filter(Boolean).join(' · '))}</small></div>`).join('');
+    const top = gk || pit;
+    return `<div class="bx">${top ? `<div class="bx-gk">${top}</div>` : ''}${head}${rows}</div>`;
   }
+
 
   // Flip the panels on the beat without waiting for new data.
   if (sideView) setInterval(() => {
@@ -1361,9 +1375,10 @@
   };
 
   // A team's own file wins over the general one: KC-touchdown.mp4 before touchdown.mp4.
-  function findMedia(moment, team) {
+  // `league` keeps one team's files off another with the same abbreviation (Bruins and Celtics are both BOS).
+  function findMedia(moment, team, league) {
     const type = (f) => f.type || (f.video ? 'video' : 'audio');
-    const pick = (t) => media.find((f) => f.moment === moment && f.team === team && type(f) === t)
+    const pick = (t) => media.find((f) => f.moment === moment && team && f.team === team && f.league === league && type(f) === t)
       || media.find((f) => f.moment === moment && !f.team && type(f) === t);
     return { video: pick('video'), audio: pick('audio'), image: pick('image') };
   }
@@ -1372,7 +1387,7 @@
   // Your own logo for a team (BOS-logo.webp) wins over ESPN's, on every screen.
   function logoFor(t) {
     if (!t) return null;
-    const own = media.find((f) => f.moment === 'logo' && f.team === t.abbr && f.type === 'image');
+    const own = media.find((f) => f.moment === 'logo' && f.team === t.abbr && f.league === t.league && f.type === 'image');
     return own ? mediaUrl(own) : t.logo;
   }
 
@@ -1475,7 +1490,7 @@
   function showTakeover(item) {
     const { moment, follow } = item;
     const { g, us } = teamsFor(follow, item.team);
-    const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, item.team || follow);
+    const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, item.team || follow, g && g.league);
     tkoEl.className = 'tko' + (moment === 'anthem' ? ' anthem' : '') + (found.video ? ' has-video' : '');
     const colors = paint(tkoEl, us);
     let html;
@@ -1543,7 +1558,7 @@
     bannerEl.innerHTML = `<div class="stripes"></div><b>${esc(big)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
     bannerEl.hidden = false;
     let els = [];
-    if (moment) { const found = findMedia(moment, team || follow); if (found.audio) els = playMedia({ audio: found.audio }); }
+    if (moment) { const fg = state && state.games && state.games[follow]; const found = findMedia(moment, team || follow, fg && fg.league); if (found.audio) els = playMedia({ audio: found.audio }); }
     bannerTimer = setTimeout(() => {
       fadeOut(els);
       bannerEl.classList.add('out');

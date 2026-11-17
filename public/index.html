@@ -129,7 +129,8 @@
     const s = await (await fetch('/api/status')).json();
     const opts = s.teams.map((t) => `<option value="${esc(t.abbr)}">${esc(t.name)}</option>`).join('');
     $('tteam').innerHTML = opts;
-    $('mteam').innerHTML += opts;
+    // Uploads are tied to a team and its league (nhl_BOS), so the Bruins' files never land on the Celtics.
+    $('mteam').innerHTML += s.teams.map((t) => `<option value="${esc(t.league)}_${esc(t.abbr)}">${esc(t.name)} (${esc(t.league.toUpperCase())})</option>`).join('');
     $('tbuttons').innerHTML = TESTS.map(([k, label]) => `<button data-k="${k}" class="${k === 'clear' ? 'danger' : ''}">${label}</button>`).join('');
     $('tbuttons').onclick = (e) => {
       const k = e.target.dataset.k;
@@ -141,7 +142,7 @@
   async function refreshMedia() {
     const { files } = await (await fetch('/api/media')).json();
     $('mlist').innerHTML = files.length
-      ? files.map((f) => `<tr><td>${esc(f.team || 'Any team')}</td><td>${esc(MOMENT_NAMES[f.moment] || f.moment)}</td><td>${f.type === 'image' ? 'picture' : f.video ? 'video' : 'sound'}</td>` +
+      ? files.map((f) => `<tr><td>${esc(f.team ? `${f.team}${f.league ? ` ${f.league.toUpperCase()}` : ''}` : 'Any team')}</td><td>${esc(MOMENT_NAMES[f.moment] || f.moment)}</td><td>${f.type === 'image' ? 'picture' : f.video ? 'video' : 'sound'}</td>` +
         `<td class="meta">${(f.size / 1048576).toFixed(1)} MB</td><td><a href="/media/${encodeURIComponent(f.name)}" target="_blank" style="color:#9fb5d9">play</a></td>` +
         `<td><button class="danger" data-del="${esc(f.name)}">Remove</button></td></tr>`).join('')
       : '<tr><td class="empty">Nothing uploaded yet. Takeovers still run, just silent.</td></tr>';

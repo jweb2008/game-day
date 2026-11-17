@@ -61,7 +61,7 @@ Sounds and videos are optional and live in `media/` (outside git). Name them for
 optionally the team: `touchdown.mp4`, `KC-touchdown.mp3`, `BOS-win.mp3`, `defense.mp3`, `anthem.mp4`.
 Pictures (PNG, JPG, GIF, WebP) work too: on a score they replace the team logo, and for the anthem a
 picture or video replaces the built-in flag (anthem videos play muted, since the anthem is on TV).
-A team logo picture (`BOS-logo.webp`) replaces ESPN's logo for that team on every screen.
+A team logo picture (`nhl_BOS-logo.webp`) replaces ESPN's logo for that team on every screen. Team files carry the league as well as the abbreviation, so the Bruins' files never show up for the Celtics (both are BOS). Files saved before this (`BOS-logo.webp`) are renamed to the league of the team you follow at start-up.
 A team's own file wins over the general one. Add `?sound=0` to any screen that should stay quiet.
 
 Per-house overrides go in `config.local.json` next to `config.json` (not tracked in git).

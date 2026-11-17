@@ -580,11 +580,28 @@ const VIDEO = ['mp4', 'webm'];
 const IMAGE = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 const MAX_UPLOAD = 150 * 1024 * 1024;
 
+// Names: [league_][TEAM-]moment.ext, e.g. nhl_BOS-logo.webp, nhl_BOS-win.mp3, touchdown.mp4.
+// The league keeps the Bruins' files off the Celtics (both are BOS).
 function mediaName(name) {
-  const m = /^(?:([A-Z]{2,4})-)?([a-z]+)\.([a-z0-9]+)$/.exec(name || '');
-  if (!m || !MOMENTS.includes(m[2]) || ![...AUDIO, ...VIDEO, ...IMAGE].includes(m[3])) return null;
-  const type = VIDEO.includes(m[3]) ? 'video' : IMAGE.includes(m[3]) ? 'image' : 'audio';
-  return { team: m[1] || null, moment: m[2], ext: m[3], type, video: type === 'video' };
+  const m = /^(?:([a-z0-9.\-]+)_)?(?:([A-Z]{2,4})-)?([a-z]+)\.([a-z0-9]+)$/.exec(name || '');
+  if (!m || !MOMENTS.includes(m[3]) || ![...AUDIO, ...VIDEO, ...IMAGE].includes(m[4])) return null;
+  const type = VIDEO.includes(m[4]) ? 'video' : IMAGE.includes(m[4]) ? 'image' : 'audio';
+  return { league: m[1] || null, team: m[2] || null, moment: m[3], ext: m[4], type, video: type === 'video' };
+}
+
+// Files saved before leagues were part of the name (BOS-logo.webp): give each the league of the
+// team you follow with that abbreviation, once, at start-up.
+function migrateMedia() {
+  if (!fs.existsSync(MEDIA_DIR)) return;
+  for (const f of fs.readdirSync(MEDIA_DIR)) {
+    const info = mediaName(f);
+    if (!info || !info.team || info.league) continue;
+    const owners = config.teams.filter((t) => t.abbr === info.team);
+    if (owners.length !== 1) continue;
+    const to = `${owners[0].league}_${f}`;
+    if (!fs.existsSync(path.join(MEDIA_DIR, to))) fs.renameSync(path.join(MEDIA_DIR, f), path.join(MEDIA_DIR, to));
+    console.log(`media: ${f} is now ${to}`);
+  }
 }
 
 function listMedia() {
@@ -617,7 +634,7 @@ function saveMedia(req, res, name) {
     if (failed) return;
     // One sound, one video and one picture per moment: replace the old one of the same kind.
     for (const f of listMedia()) {
-      if (f.team === info.team && f.moment === info.moment && f.type === info.type) fs.rmSync(path.join(MEDIA_DIR, f.name), { force: true });
+      if (f.team === info.team && f.league === info.league && f.moment === info.moment && f.type === info.type) fs.rmSync(path.join(MEDIA_DIR, f.name), { force: true });
     }
     fs.renameSync(tmp, path.join(MEDIA_DIR, name));
     broadcast('media', listMedia());
@@ -896,6 +913,8 @@ process.on('unhandledRejection', (err) => console.error('unhandled:', (err && er
 // Keep idle connections from timing out behind TV browsers.
 setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000);
 setInterval(tick, 1000);
+
+try { migrateMedia(); } catch (err) { console.error('media migration:', err.message); }
 
 server.listen(port, () => {
   console.log(`Game Day running on port ${port}, delay ${config.delaySeconds}s, following ${config.teams.map((t) => t.name).join(', ')}`);
