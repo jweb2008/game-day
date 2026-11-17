@@ -312,6 +312,13 @@
   .nextup .nu-txt span { display: block; font-size: 5vmin; color: var(--muted); margin-top: 1vmin; }
   .nextup .nu-when { margin-top: 3vmin; font-size: 5vmin; color: #cfd6e2; }
   .nextup .nu-when b { display: block; font-size: 8vmin; color: #f5f3ee; }
+  .upnext .un-teams { display: flex; align-items: center; justify-content: space-around; gap: 3vmin; margin-top: 3vmin; }
+  .upnext .un-team { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; flex: 1; }
+  .upnext .un-team img { width: 24vmin; height: 24vmin; object-fit: contain; filter: drop-shadow(0 1.5vmin 2vmin rgba(0,0,0,.35)); }
+  .upnext .un-team b { font-size: 6vmin; font-weight: 800; margin-top: 1.5vmin; }
+  .upnext .un-team span { font-size: 4.2vmin; color: var(--muted); }
+  .upnext .un-at { font-size: 6vmin; color: var(--muted); font-weight: 700; }
+  .upnext .un-field b { font-size: 7vmin; }
   /* ---- Pregame: recent form and players to watch ---- */
   .pg { margin: 2.4vmin 5vmin 0; display: flex; flex-direction: column; gap: 2vmin; color: #f5f3ee; }
   .pg h4 { margin: 0; font-size: 4vmin; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -906,6 +913,20 @@
       `<div class="nu-when"><b>${esc(when)}</b>${esc(dayTime(x.start))}${x.broadcast ? ` · ${esc(x.broadcast)}` : ''}</div></div>`;
   }
 
+  // Between games: the next game on the screens (from your slots), once this one is final.
+  function upNextHTML(g) {
+    const key = state && state.slot && state.slot.upNext;
+    const x = key && state.games && state.games[key];
+    if (!x || x.id === g.id || !x.start) return '';
+    const mins = Math.max(0, Math.round((Date.parse(x.start) - Date.now()) / 60000));
+    const inWords = mins < 60 ? `In ${mins} min` : mins < 24 * 60 ? `In ${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m` : dayTime(x.start);
+    const team = (t) => t ? `<div class="un-team">${t.logo ? `<img src="${esc(logoFor(t) || t.logo)}" alt="" onerror="this.style.visibility='hidden'">` : ''}<b>${esc(t.name || t.abbr)}</b><span>${esc(t.record || '')}</span></div>` : '';
+    const body = x.kind === 'field' ? `<div class="un-field"><b>${esc(x.name || '')}</b></div>`
+      : `<div class="un-teams">${team(x.away)}<span class="un-at">@</span>${team(x.home)}</div>`;
+    return `<div class="pg nextup upnext"><h4>Up next on the screens</h4>${body}` +
+      `<div class="nu-when"><b>${esc(inWords)}</b>${esc(dayTime(x.start))}${x.broadcast ? ` · ${esc(x.broadcast)}` : ''}</div></div>`;
+  }
+
   // ---- Pregame panels ----
   function countdownText(g) {
     const ms = Date.parse(g.start) - Date.now();
@@ -986,7 +1007,9 @@
     }
     if (g.state === 'post') {
       const ft = featuredTeam(featuredFollow(), g);
-      const panel = prePanel([statBars(g), starsHTML(g), ft && nextGameHTML(g, ft)]);
+      const up = upNextHTML(g);
+      // The next game's teaser leads the turn order between games, so it's up as soon as this one ends.
+      const panel = up ? prePanel([up, statBars(g), up, starsHTML(g), ft && nextGameHTML(g, ft)]) : prePanel([statBars(g), starsHTML(g), ft && nextGameHTML(g, ft)]);
       return panel + '<div class="spacer"></div>';
     }
     let html = '';
@@ -1142,7 +1165,7 @@
     if (g.state === 'pre') {
       const pg = prePanel([pregameOne(g, t), scheduleOne(g, t), matchupOne(g, t), spotlightOne(g, t), ...standingsPanels(g, t)]);
       mid = (countdownText(g) ? `<div class="sd-countdown${pg ? ' slim' : ''}"><div class="big cd-big">{CD}</div><div class="sub">until ${startWord(g)}</div></div>` : '') + pg;
-    } else if (g.state === 'post' && (g.stars || g.upcoming || (g.stats || []).length)) {
+    } else if (g.state === 'post' && (g.stars || g.upcoming || (g.stats || []).length || upNextHTML(g))) {
       // Postgame: this team's stats, the stars of the game and its next game take turns.
       const stats = (g.stats || []).length ? '<div class="sd-stats">' + g.stats.slice(0, 8).map((r) => {
         const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
@@ -1150,7 +1173,8 @@
         return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
           `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>' : '';
-      mid = prePanel([stats, starsHTML(g), nextGameHTML(g, t)]);
+      const up = upNextHTML(g);
+      mid = up ? prePanel([up, stats, up, starsHTML(g), nextGameHTML(g, t)]) : prePanel([stats, starsHTML(g), nextGameHTML(g, t)]);
     } else if (g.kind === 'match' && (t.periods || []).length) {
       // Tennis: games won in each set, each bar against the other player's.
       mid = '<div class="sd-stats">' + t.periods.map((v, i) => {

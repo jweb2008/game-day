@@ -84,3 +84,13 @@ run at 4:00 AM Mountain (`update.sh --auto`) that only restarts when there's som
 is on or starting within 90 minutes. Each run is logged to `update-log.json` and shown on the status
 page. Turn it off with `systemctl disable --now game-day-update.timer`. Home Assistant changes are
 never automatic; they're listed in the build plan's checklist.
+
+## Between games
+
+With nothing live, a game that just ended keeps the screens (postgame stats, stars, and an "Up next
+on the screens" teaser for the next slot game) while the next game is at least 15 minutes away, for
+up to 90 minutes. Back to back (under 15 minutes): straight to the next game's pregame.
+
+Followed teams always get a slot of their own (it holds that team's current or next game), so their
+games come up without a calendar pick. Empty a team's slot on the dashboard and it stays out until
+you add it back.

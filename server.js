@@ -173,8 +173,22 @@ async function pollOnce() {
   for (const [k, g] of Object.entries(games)) if (watchedIds.has(g.id)) delete all[k];
   await addStats(all);
   noteScores(live.games, all);
+  noteFinals(live.games, all);
   live = { at: new Date().toISOString(), games: all, ticker };
   buffer.push(live);
+}
+
+// When each game went final, so the screens can hold the postgame (stats, stars, what's next)
+// before moving on. A game already final when the app started counts as ending 3 hours after its start.
+const finalAt = new Map();
+function noteFinals(before, after) {
+  const prev = new Map(Object.values(before || {}).map((g) => [g.id, g]));
+  for (const g of Object.values(after)) {
+    if (g.state !== 'post' || finalAt.has(g.id)) continue;
+    const old = prev.get(g.id);
+    finalAt.set(g.id, old && old.state !== 'post' ? Date.now() : Math.min(Date.now(), Date.parse(g.start || 0) + 3 * 3600 * 1000));
+  }
+  if (finalAt.size > 200) finalAt.delete(finalAt.keys().next().value);
 }
 
 // What update.sh last did (written by the script, newest first).
@@ -553,6 +567,8 @@ function onBreak(g) {
   return /STATUS_HALFTIME|STATUS_END_PERIOD|INTERMISSION/i.test(g.statusName || '') || /halftime|intermission|^end\b|end of/i.test(g.detail || '');
 }
 
+const POST_HOLD_MS = 90 * 60 * 1000;
+const NEXT_GAP_MS = 15 * 60 * 1000;
 function slotPick(games) {
   // "Show now" from the dashboard holds one game until it's cleared.
   if (config.pin && games[config.pin]) return { key: config.pin, pinned: true, live: 0 };
@@ -569,9 +585,32 @@ function slotPick(games) {
     const turn = Math.floor(Date.now() / slotCycleMs()) % others.length;
     return { key: others[turn], live: live.length, turn: live.indexOf(others[turn]), mode: 'break', main };
   }
-  const soon = filled.find((k) => games[k].state === 'pre');
+  // Nothing live. A game that just ended keeps the screens (postgame stats, stars, and a teaser for
+  // the next game) as long as the next game is at least 15 minutes away, for up to 90 minutes.
+  // Back to back (next one under 15 minutes out): straight to the next game.
+  const next = filled.filter((k) => games[k].state === 'pre').sort((a, b) => Date.parse(games[a].start || 0) - Date.parse(games[b].start || 0))[0] || null;
+  const lead = next ? Date.parse(games[next].start || 0) - Date.now() : Infinity;
+  const ended = (k) => finalAt.get(games[k].id) || Date.parse(games[k].start || 0) + 3 * 3600 * 1000;
+  const recent = filled.filter((k) => games[k].state === 'post' && Date.now() - ended(k) < POST_HOLD_MS).sort((a, b) => ended(b) - ended(a))[0];
+  if (recent && lead >= NEXT_GAP_MS) return { key: recent, live: 0, mode: 'post', upNext: next };
   const final = filled.find((k) => games[k].state === 'post');
-  return { key: soon || final || filled[0], live: 0 };
+  return { key: next || final || filled[0], live: 0 };
+}
+
+// Your followed teams always have a slot, so their games show up without a daily calendar pick.
+// A team slot holds that team's current or next game, so it never needs updating. Empty a team's
+// slot on the dashboard and it stays out until you add it back.
+function ensureFavorites() {
+  const list = slots();
+  const removed = new Set(config.slotsRemoved || []);
+  let changed = false;
+  for (const t of config.teams) {
+    if (!following(t.abbr) || removed.has(t.abbr) || list.includes(t.abbr)) continue;
+    const free = list.indexOf(null);
+    if (free < 0) break;
+    list[free] = t.abbr; changed = true;
+  }
+  if (changed) saveSlots(list);
 }
 
 function saveSlots(list) {
@@ -967,7 +1006,16 @@ const server = http.createServer((req, res) => {
     if (url.searchParams.has('set')) {
       const valid = new Set([...config.teams.map((t) => t.abbr), ...watchList().map((w) => `G${w.id}`)]);
       const list = String(url.searchParams.get('set')).split(',').map((k) => (valid.has(k) ? k : null));
-      saveSlots(list.map((k, i) => (k && list.indexOf(k) === i ? k : null)).concat(Array(SLOT_COUNT).fill(null)).slice(0, SLOT_COUNT));
+      const before = slots();
+      const after = list.map((k, i) => (k && list.indexOf(k) === i ? k : null)).concat(Array(SLOT_COUNT).fill(null)).slice(0, SLOT_COUNT);
+      const removed = new Set(config.slotsRemoved || []);
+      for (const t of config.teams) {
+        if (before.includes(t.abbr) && !after.includes(t.abbr)) removed.add(t.abbr);
+        if (after.includes(t.abbr)) removed.delete(t.abbr);
+      }
+      config.slotsRemoved = [...removed];
+      saveLocal({ slotsRemoved: config.slotsRemoved });
+      saveSlots(after);
     }
     return json(res, 200, { slots: slots(), cycleMinutes: Math.max(1, Number(config.slotCycleMinutes) || 5) });
   }
@@ -978,6 +1026,7 @@ const server = http.createServer((req, res) => {
     const on = !/^(0|off|false)$/i.test(url.searchParams.get('on') || '1');
     config.follow = { ...(config.follow || {}), [team]: on };
     saveLocal({ follow: config.follow });
+    if (on) ensureFavorites();
     broadcast('state', screenState());
     return json(res, 200, { follow: config.follow });
   }
@@ -1026,6 +1075,7 @@ setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000
 setInterval(tick, 1000);
 
 try { migrateMedia(); } catch (err) { console.error('media migration:', err.message); }
+try { ensureFavorites(); } catch (err) { console.error('favorite slots:', err.message); }
 
 server.listen(port, () => {
   console.log(`Game Day running on port ${port}, delay ${config.delaySeconds}s, following ${config.teams.map((t) => t.name).join(', ')}`);
