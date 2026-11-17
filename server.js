@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
+const { fetchRoster, matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
 const { pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
@@ -335,19 +335,65 @@ async function standingsFor(lg) {
 // Spotlight (pregame): each team's top player in its first leader category (goals, passing yards...),
 // game by game over their last five. Game logs change once a game, so they're kept for 6 hours.
 const gamelogCache = new Map(); // athleteId -> { t, data }
+// Spotlights, last five games each. Hockey: a forward (the team's top scorer), the defenseman with
+// the most points lately, and the goalie who has been starting. Other sports: the top leader.
+const rosterCache = new Map(); // "league:abbr" -> { t, list }
+async function gamelogOf(game, id) {
+  let c = gamelogCache.get(id);
+  if (!c || Date.now() - c.t > 6 * 3600 * 1000) {
+    try { c = { t: Date.now(), data: await fetchGamelog(sportOf(game.league), game.league, id) }; }
+    catch (err) { console.error('game log error:', err.message); c = { t: Date.now() - 5 * 3600 * 1000, data: null }; } // retry in an hour
+    gamelogCache.set(id, c);
+  }
+  return c.data;
+}
+async function rosterOf(game, abbr) {
+  const key = `${game.league}:${abbr}`;
+  let c = rosterCache.get(key);
+  if (!c || Date.now() - c.t > 12 * 3600 * 1000) {
+    try { c = { t: Date.now(), list: await fetchRoster(sportOf(game.league), game.league, abbr) }; }
+    catch (err) { console.error('roster error:', err.message); c = { t: Date.now() - 11 * 3600 * 1000, list: [] }; }
+    rosterCache.set(key, c);
+  }
+  return c.list;
+}
+const lastFive = (data, ...stats) => { for (const st of stats) { const g = data && pickLastFive(data, st); if (g && g.length) return { stat: st, games: g }; } return null; };
+const recent = (games, days = 21) => games.filter((x) => x.date && Date.now() - Date.parse(x.date) < days * 86400 * 1000).length;
+const sum = (games) => games.reduce((a, x) => a + x.value, 0);
+
 async function spotlight(game, leaders) {
+  const hockey = /hockey|nhl/.test(game.league);
   const out = {};
   for (const [abbr, list] of Object.entries(leaders || {})) {
-    const p = (list || [])[0];
-    if (!p || !p.id || !p.stat) continue;
-    let c = gamelogCache.get(p.id);
-    if (!c || Date.now() - c.t > 6 * 3600 * 1000) {
-      try { c = { t: Date.now(), data: await fetchGamelog(sportOf(game.league), game.league, p.id) }; }
-      catch (err) { console.error('game log error:', err.message); c = { t: Date.now() - 5 * 3600 * 1000, data: null }; } // retry in an hour
-      gamelogCache.set(p.id, c);
+    const cards = [];
+    // Forward (or, outside hockey, the team's first leader).
+    const top = (list || []).find((p) => p.id && p.stat && (!hockey || !/^(D|G)$/.test(p.pos))) || (list || [])[0];
+    if (top && top.id && top.stat) {
+      const data = await gamelogOf(game, top.id);
+      const games = data ? pickLastFive(data, top.stat) : null;
+      if (games && games.length) cards.push({ role: hockey ? 'Forward' : '', name: top.name, short: top.short, pos: top.pos, headshot: top.headshot, label: top.label, games });
     }
-    const games = c.data ? pickLastFive(c.data, p.stat) : null;
-    if (games && games.length) out[abbr] = { name: p.name, short: p.short, pos: p.pos, headshot: p.headshot, label: p.label, games };
+    if (hockey) {
+      const roster = await rosterOf(game, abbr);
+      const isD = (p) => /^D$/i.test(p.pos) || /defen/i.test(p.group) || /defen/i.test(p.pos);
+      const isG = (p) => /^G$/i.test(p.pos) || /goal/i.test(p.group) || /goal/i.test(p.pos);
+      const logs = async (people, ...stats) => (await Promise.all(people.map(async (p) => {
+        const f = lastFive(await gamelogOf(game, p.id), ...stats);
+        return f ? { p, ...f } : null;
+      }))).filter((x) => x && recent(x.games) > 0);
+      // Defenseman: most points over his last five.
+      const ds = await logs(roster.filter(isD), 'points', 'PTS');
+      ds.sort((a, b) => sum(b.games) - sum(a.games) || recent(b.games) - recent(a.games));
+      if (ds[0]) cards.push({ role: 'Defense', name: ds[0].p.name, short: ds[0].p.short, pos: 'D', headshot: ds[0].p.headshot, label: 'Points', games: ds[0].games });
+      // Goalie: the one with the most starts lately, by save percentage (saves if that's missing).
+      const gs = await logs(roster.filter(isG), 'savePct', 'SV%', 'saves', 'SV');
+      gs.sort((a, b) => recent(b.games, 14) - recent(a.games, 14) || Date.parse(b.games[b.games.length - 1].date || 0) - Date.parse(a.games[a.games.length - 1].date || 0));
+      if (gs[0]) {
+        const pct = /pct|%/i.test(gs[0].stat);
+        cards.push({ role: 'Goalie', name: gs[0].p.name, short: gs[0].p.short, pos: 'G', headshot: gs[0].p.headshot, label: pct ? 'Save %' : 'Saves', avg: pct, games: gs[0].games });
+      }
+    }
+    if (cards.length) out[abbr] = cards;
   }
   return out;
 }

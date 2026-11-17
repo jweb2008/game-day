@@ -247,6 +247,19 @@
   .sp-bar i { display: block; width: 100%; border-radius: 1vmin 1vmin 0 0; background: var(--sd-band-bright, var(--accent)); min-height: .8vmin; }
   .sp-bar small { font-size: 3.4vmin; color: var(--muted); margin-top: 1vmin; white-space: nowrap; }
   .sp-bar small.W { color: #5ad19a; } .sp-bar small.L { color: #ff7b7b; }
+  .sp-card { display: flex; flex-direction: column; gap: 2vmin; }
+  .sp.multi { gap: 2.6vmin; }
+  .sp-card.compact { gap: 1vmin; padding-bottom: 2vmin; border-bottom: .25vmin solid rgba(255,255,255,.08); }
+  .sp-card.compact .sp-head { display: flex; align-items: center; justify-content: space-between; gap: 2vmin; }
+  .sp-card.compact .sp-head .pg-player { flex: 1; min-width: 0; padding: 0; border: 0; }
+  .sp-card.compact .sp-head .pg-player img, .sp-card.compact .sp-head .pg-player .ph { width: 9vmin; height: 9vmin; }
+  .sp-card.compact .sp-total { font-size: 3.6vmin; text-align: right; white-space: nowrap; }
+  .sp-card.compact .sp-total b { font-size: 5.6vmin; }
+  .sp-card.compact .sp-bars { height: auto; gap: 2vmin; }
+  .sp-card.compact .sp-bar { height: auto; }
+  .sp-card.compact .sp-bar i { height: calc(var(--h) * 7vmin) !important; flex-shrink: 0; }
+  .sp-card.compact .sp-bar b { font-size: 3.8vmin; margin-bottom: .5vmin; }
+  .sp-card.compact .sp-bar small { font-size: 3vmin; margin-top: .5vmin; }
 
   .status .rz { color: #ff6b6b; }
   /* The right TV's top bar carries down and distance, so its situation box would only repeat it. */
@@ -281,6 +294,8 @@
   .st-row.head .rec { color: var(--muted); font-weight: 600; }
   .st-row.hl { background: rgba(255,255,255,.1); border-left: 1vmin solid var(--sd-band-bright, var(--accent)); }
   .st-row.gap { color: var(--muted); padding: 0 1.2vmin; }
+  .st:has(.gr) .st-row:not(.gap) { grid-template-columns: 9vmin 7vmin 1fr auto 9vmin 12vmin; }
+  .st-row b.gr { color: #cfd6e2; font-weight: 600; }
   .st-cut { border-top: .5vmin dashed rgba(255,255,255,.4); margin: .8vmin 0; }
 
   /* Next 5 and the postgame panels */
@@ -731,27 +746,38 @@
       rows.map(([x, l, y]) => `<div class="mu-cmp"><b>${esc(x)}</b><span>${esc(l)}</span><b>${esc(y)}</b></div>`).join('') + matchupNotes(m) + '</div>';
   }
 
-  // Spotlight: the team's top player in its first category, one bar per game over the last five.
+  // Spotlight: players game by game over their last five. Hockey has three per team (a forward,
+  // a defenseman and the goalie who's been starting); other sports have the team's top leader.
+  const spList = (sp) => (Array.isArray(sp) ? sp : sp ? [sp] : []).filter((x) => x && (x.games || []).length);
   function spotlightBlock(sp, compact) {
     if (!sp || !(sp.games || []).length) return '';
-    const max = Math.max(1, ...sp.games.map((x) => x.value));
-    const total = sp.games.reduce((a, x) => a + x.value, 0);
-    const fmt = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
-    const bars = sp.games.map((x) => `<div class="sp-bar"><b>${fmt(x.value)}</b><i style="height:${Math.round((x.value / max) * 100)}%"></i>` +
+    const pctLike = sp.avg;
+    const fmtPct = (v) => (v <= 1 ? v.toFixed(3).replace(/^0/, '') : v.toFixed(1));
+    const fmt = (v) => (pctLike ? fmtPct(v) : Number.isInteger(v) ? v : v.toFixed(1));
+    const vals = sp.games.map((x) => x.value);
+    // Save %: bars show how far above .850 each game was, so a .920 and a .880 night look different.
+    const base = pctLike ? Math.min(...vals) * 0.97 : 0;
+    const max = Math.max(pctLike ? 0.0001 : 1, ...vals.map((v) => v - base));
+    const total = pctLike ? vals.reduce((a, v) => a + v, 0) / vals.length : vals.reduce((a, v) => a + v, 0);
+    const bars = sp.games.map((x) => `<div class="sp-bar"><b>${fmt(x.value)}</b><i style="height:${Math.max(3, Math.round(((x.value - base) / max) * 100))}%;--h:${Math.max(0.06, (x.value - base) / max).toFixed(2)}"></i>` +
       `<small class="${esc(x.result)}">${esc(x.atVs === '@' ? '@' : 'v')} ${esc(x.opp)}</small></div>`).join('');
-    const who = playerRow({ ...sp, value: '' });
-    return `${who}<div class="sp-total"><b>${fmt(total)}</b>${esc((sp.label || '').toLowerCase())} in the last ${sp.games.length}</div><div class="sp-bars">${bars}</div>`;
+    const who = playerRow({ ...sp, pos: [sp.role, sp.pos && sp.role !== 'Goalie' && sp.role !== 'Defense' ? sp.pos : ''].filter(Boolean).join(' '), value: '' });
+    const line = pctLike ? `${esc((sp.label || '').toLowerCase())} over the last ${sp.games.length}` : `${esc((sp.label || '').toLowerCase())} in the last ${sp.games.length}`;
+    if (compact) return `<div class="sp-card compact"><div class="sp-head">${who}<div class="sp-total"><b>${fmt(total)}</b>${esc((sp.label || '').toLowerCase())}${pctLike ? ' avg' : ''}</div></div><div class="sp-bars">${bars}</div></div>`;
+    return `<div class="sp-card">${who}<div class="sp-total"><b>${fmt(total)}</b>${line}</div><div class="sp-bars">${bars}</div></div>`;
   }
   function spotlightOne(g, t) {
-    const sp = g.spotlight && g.spotlight[t.abbr];
-    const body = spotlightBlock(sp);
-    return body ? `<div class="sp"><h4>Spotlight · last ${sp.games.length} games</h4>${body}</div>` : '';
+    const list = spList(g.spotlight && g.spotlight[t.abbr]);
+    if (!list.length) return '';
+    const compact = list.length > 1;
+    return `<div class="sp${compact ? ' multi' : ''}"><h4>Spotlight · last 5 games</h4>${list.map((sp) => spotlightBlock(sp, compact)).join('')}</div>`;
   }
-  // Combined scoreboard: room for one, so your team's player (or the side you cheer for).
+  // Combined scoreboard: your team's players (or the side you cheer for).
   function spotlightBoth(g) {
     const follow = featuredFollow();
     const mine = featuredTeam(follow, g);
-    const t = (mine && g.spotlight && g.spotlight[mine.abbr]) ? mine : [g.away, g.home].find((x) => x && g.spotlight && g.spotlight[x.abbr]);
+    const has = (x) => x && g.spotlight && spList(g.spotlight[x.abbr]).length;
+    const t = has(mine) ? mine : [g.away, g.home].find(has);
     return t ? spotlightOne(g, t).replace('<h4>Spotlight', `<h4>${esc(t.abbr)} spotlight`) : '';
   }
   // Pregame panels take turns: players, matchup, spotlight (whichever have data).
@@ -771,8 +797,18 @@
       ? n(b.points) - n(a.points) || n(a.gp) - n(b.gp) || n(b.wins) - n(a.wins)
       : n(b.pct) - n(a.pct) || n(b.wins) - n(a.wins));
   }
+  // Regular-season length, for the games-remaining (GR) column in the wild card race.
+  const SEASON_GAMES = { nhl: 82, nba: 82, wnba: 44, nfl: 17, mlb: 162 };
+  function gamesLeft(r, g) {
+    const total = SEASON_GAMES[g.league];
+    if (!total) return null;
+    let gp = Number.isFinite(r.gp) ? r.gp : null;
+    if (gp == null && r.record) gp = String(r.record).split('-').reduce((a, x) => a + (parseInt(x, 10) || 0), 0);
+    return gp == null ? null : Math.max(0, total - gp);
+  }
   function stTable(title, list, g, opts = {}) {
     const hockey = g.league === 'nhl' || /hockey/.test(g.league);
+    const gr = opts.gr && SEASON_GAMES[g.league];
     const hl = new Set([g.home && g.home.abbr, g.away && g.away.abbr]);
     const val = (r) => (hockey ? (r.points != null ? Math.round(r.points) : '') : (r.pct != null ? r.pct.toFixed(3).replace(/^0/, '') : ''));
     const rows = list.map((item) => {
@@ -780,9 +816,9 @@
       if (item === 'gap') return '<div class="st-row gap"><span>…</span></div>';
       const { r, rank } = item;
       const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
-      return `<div class="st-row${hl.has(r.abbr) ? ' hl' : ''}"><span class="rk">${esc(rank)}</span>${pic}<span class="nm">${esc(r.abbr)}${r.clinch ? ` <small>${esc(r.clinch)}</small>` : ''}</span><span class="rec">${esc(r.record)}</span><b>${esc(val(r))}</b></div>`;
+      return `<div class="st-row${hl.has(r.abbr) ? ' hl' : ''}"><span class="rk">${esc(rank)}</span>${pic}<span class="nm">${esc(r.abbr)}${r.clinch ? ` <small>${esc(r.clinch)}</small>` : ''}</span><span class="rec">${esc(r.record)}</span>${gr ? `<b class="gr">${esc(gamesLeft(r, g) ?? '')}</b>` : ''}<b>${esc(val(r))}</b></div>`;
     }).join('');
-    return `<div class="st"><h4>${esc(title)}</h4><div class="st-row head"><span class="rk">#</span><span></span><span class="nm">Team</span><span class="rec">Record</span><b>${hockey ? 'PTS' : 'PCT'}</b></div>${rows}</div>`;
+    return `<div class="st"><h4>${esc(title)}</h4><div class="st-row head"><span class="rk">#</span><span></span><span class="nm">Team</span><span class="rec">Record</span>${gr ? '<b class="gr">GR</b>' : ''}<b>${hockey ? 'PTS' : 'PCT'}</b></div>${rows}</div>`;
   }
   // Top N, then the two teams in this game if they sit lower.
   // At most `rows` lines: the top of the table, then "…" and this game's teams if they sit lower.
@@ -824,7 +860,7 @@
         const out = sortStand(conf.filter((r) => !Number.isFinite(r.seed) || r.seed > 7), g);
         wc = [...seeded.map((r) => ({ r, rank: r.seed })), 'cut', ...out.slice(0, 3).map((r) => ({ r, rank: '' }))];
       }
-      if (wc) panels.push(stTable(`${me.conf} · wild card`, wc, g));
+      if (wc) panels.push(stTable(`${me.conf} · wild card`, wc, g, { gr: true }));
       panels.push(stTable(me.conf, topWith(sortStand(conf, g), 7, g), g));
     }
     panels.push(stTable(g.league === 'nhl' ? 'NHL' : g.league === 'nfl' ? 'NFL' : 'League', topWith(sortStand(all, g), 7, g), g));
@@ -931,7 +967,7 @@
   function fitPlayers(el) {
     const panes = el.querySelectorAll ? [...el.querySelectorAll('.sd-pane')] : [];
     if (panes.length) { panes.forEach(fitPlayers); return; }
-    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .st-row:not(.head):not(.hl), .nx-row')];
+    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .sp-card.compact:not(:first-of-type), .st-row:not(.head):not(.hl), .nx-row')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
