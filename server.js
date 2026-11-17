@@ -177,6 +177,11 @@ async function pollOnce() {
   buffer.push(live);
 }
 
+// What update.sh last did (written by the script, newest first).
+function readUpdateLog() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'update-log.json'), 'utf8')).slice(0, 5); } catch { return []; }
+}
+
 // ---- Sync to a score ---------------------------------------------------------
 // When each score first showed up in ESPN's feed (before the delay). Tapping "Sync" the moment
 // a score happens on your TV sets the delay to how long ago the app saw it, so the screens and
@@ -819,6 +824,14 @@ const server = http.createServer((req, res) => {
     return json(res, 200, url.searchParams.get('raw') ? c.raw : { at: new Date(c.t).toISOString(), state: c.state, read: c.extra, topKeys: Object.keys(c.raw || {}) });
   }
 
+  // For the nightly update: true while a game you follow (or picked) is on or starts within 90 minutes.
+  if (url.pathname === '/api/busy') {
+    const soon = Date.now() + 90 * 60 * 1000;
+    const games = Object.values(live.games || {});
+    const busyNow = games.some((g) => g.state === 'in' || (g.state === 'pre' && g.start && Date.parse(g.start) < soon));
+    return json(res, 200, { busy: busyNow });
+  }
+
   if (url.pathname === '/api/status') {
     return json(res, 200, {
       delaySeconds: config.delaySeconds,
@@ -831,6 +844,7 @@ const server = http.createServer((req, res) => {
       screens: clients.size,
       homeAssistant: { url: config.homeAssistant?.url || null, ...haLink },
       events: recentEvents,
+      updates: readUpdateLog(),
     });
   }
 

@@ -37,6 +37,7 @@ bash /opt/game-day/update.sh
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
 | `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`); Home Assistant's delay slider calls this |
+| `GET /api/busy` | `{busy}`: a followed or picked game is on or starts within 90 minutes (the nightly update waits) |
 | `POST /api/sync` | Tap the moment a score happens on your TV: sets the delay to how long ago the app saw that score (newest score in the game on the screens; `?game=<id>` picks one) and sends `{type: 'delay', seconds}` to Home Assistant so the Goal delay slider follows. `GET` lists the scores it could sync to |
 | `POST /api/follow?team=NE&on=0` | Follow switch: an unfollowed team is left off the screens and sends no events (Home Assistant sets this) |
 | `POST /api/featured?team=KC` | Game picker: which followed team the screens show; `team=auto` for live first |
@@ -74,3 +75,12 @@ themselves between readings (football, hockey, basketball, lacrosse) and correct
 When readings stop changing, the clock has stopped, and the screens settle on ESPN's stopped time;
 at a whistle the clock can run on for about one reading gap before it settles. Sync the delay to
 scores (`/api/sync`), not to the clock. During games the feed is checked every 2 seconds.
+
+## Updates
+
+`bash /opt/game-day/update.sh` pulls the newest code and restarts. Updates build on each other: one
+run catches everything since the last. `bash /opt/game-day/enable-auto-update.sh` turns on a nightly
+run at 4:00 AM Mountain (`update.sh --auto`) that only restarts when there's something new and no game
+is on or starting within 90 minutes. Each run is logged to `update-log.json` and shown on the status
+page. Turn it off with `systemctl disable --now game-day-update.timer`. Home Assistant changes are
+never automatic; they're listed in the build plan's checklist.

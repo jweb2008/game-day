@@ -112,6 +112,17 @@
     es.onerror = () => { $('summary').textContent = 'Lost connection to the server, retrying…'; };
   }
 
+  // The newest thing update.sh did, nightly or by hand.
+  function updateLine(u) {
+    if (!u) return '<span class="meta">nothing logged yet</span>';
+    const when = new Date(u.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    const who = u.auto ? 'nightly' : 'by hand';
+    const cls = u.result === 'failed' ? 'err' : u.result === 'updated' ? 'ok' : 'meta';
+    const label = { updated: 'updated', current: 'already up to date', skipped: 'skipped (game on)', failed: 'failed' }[u.result] || u.result;
+    const detail = u.result === 'updated' ? `<br><span class="meta">${u.detail.split(';').map(esc).join('<br>')}</span>` : u.result === 'failed' ? ` <span class="meta">${esc(u.detail)}</span>` : '';
+    return `<span class="${cls}">${label}</span> <span class="meta">${who}, ${esc(when)}</span>${detail}`;
+  }
+
   async function refreshStatus() {
     try {
       const s = await (await fetch('/api/status')).json();
@@ -123,7 +134,8 @@
         (s.feedError ? `<span class="err">Last error: ${esc(s.feedError)}</span>` : '<span class="ok">Feed OK</span>') +
         `<br>Home Assistant: ${!s.homeAssistant || !s.homeAssistant.url ? 'not set up'
           : s.homeAssistant.lastError ? `<span class="err">${esc(s.homeAssistant.lastError)}</span>`
-          : s.homeAssistant.lastOk ? `<span class="ok">last event sent ${ago(s.homeAssistant.lastOk)}</span>` : 'no events sent yet'}`;
+          : s.homeAssistant.lastOk ? `<span class="ok">last event sent ${ago(s.homeAssistant.lastOk)}</span>` : 'no events sent yet'}}` +
+        `<br>Updates: ${updateLine((s.updates || [])[0])}`;
       $('events').innerHTML = s.events.length
         ? s.events.map((e) => `<tr><td>${new Date(e.at).toLocaleTimeString()}</td><td>${esc(e.follow)}</td><td>${esc(e.type === 'score' && e.kind ? e.kind : e.type)}${e.type === 'score' ? ` ${esc(e.team)} +${e.points}` : ''}${e.type === 'third' ? ` (${esc(e.offense || '?')} ball)` : ''}${e.test ? ' <span class=\"meta\">test</span>' : ''}${e.type === 'final' ? ` (winner ${esc(e.winner || '?')})` : ''}</td></tr>`).join('')
         : '<tr><td class="empty">None yet. Scores, starts and finals show here.</td></tr>';
