@@ -2,7 +2,7 @@
   "port": 80,
   "timeZone": "America/Denver",
   "delaySeconds": 12,
-  "pollSeconds": 5,
+  "pollSeconds": 2,
   "idlePollSeconds": 60,
   "homeAssistant": {
     "url": "http://192.168.1.51",

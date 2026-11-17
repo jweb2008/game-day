@@ -37,6 +37,7 @@ bash /opt/game-day/update.sh
 | `/stream` | Live stream for screens (`state` and `game` events) |
 | `/api/status` | Feed, delay and recent events as JSON |
 | `POST /api/delay?seconds=12` | Change the delay (saved in `config.local.json`); Home Assistant's delay slider calls this |
+| `POST /api/sync` | Tap the moment a score happens on your TV: sets the delay to how long ago the app saw that score (newest score in the game on the screens; `?game=<id>` picks one) and sends `{type: 'delay', seconds}` to Home Assistant so the Goal delay slider follows. `GET` lists the scores it could sync to |
 | `POST /api/follow?team=NE&on=0` | Follow switch: an unfollowed team is left off the screens and sends no events (Home Assistant sets this) |
 | `POST /api/featured?team=KC` | Game picker: which followed team the screens show; `team=auto` for live first |
 | `POST /api/takeover?type=touchdown&team=KC` | Show a takeover now. Types: touchdown, fieldgoal, safety, twopoint, goal, win, third, defense, anthem, clear |
@@ -65,3 +66,11 @@ A team logo picture (`nhl_BOS-logo.webp`) replaces ESPN's logo for that team on 
 A team's own file wins over the general one. Add `?sound=0` to any screen that should stay quiet.
 
 Per-house overrides go in `config.local.json` next to `config.json` (not tracked in git).
+
+## Game clock
+
+ESPN only sends a new clock reading every 10 to 15 seconds. The screens count the clock down
+themselves between readings (football, hockey, basketball, lacrosse) and correct to each new one.
+When readings stop changing, the clock has stopped, and the screens settle on ESPN's stopped time;
+at a whistle the clock can run on for about one reading gap before it settles. Sync the delay to
+scores (`/api/sync`), not to the clock. During games the feed is checked every 2 seconds.

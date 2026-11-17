@@ -1354,6 +1354,93 @@
   }
 
 
+  // ---- Smooth game clock --------------------------------------------------
+  // ESPN only sends a new clock reading every 10 to 15 seconds, so the clock jumped in chunks.
+  // Each screen now counts the clock down itself between readings and corrects to each new one.
+  // If the reading hasn't moved for a while the clock has stopped (whistle, timeout), so it holds
+  // on ESPN's reading. Soccer and baseball are left alone (their clocks count up or don't exist).
+  // How far to count past a reading is learned from how often ESPN's readings arrive (gap), so at a
+  // whistle the clock overruns by at most one gap before settling back on the stopped time.
+  const clockObs = {};       // game id -> { reading, sec, colon, at, moving }
+  const M0 = '\uE000', M1 = '\uE001', M2 = '\uE002';
+  const countdown = (g) => /nfl|football|cfl|ufl|hockey|nhl|basketball|nba|wnba|lacrosse|ncaa|nll|pll/.test(g.league || '') && !/soccer|baseball|mlb/.test(g.league || '');
+  function parseClock(c) {
+    let m = /^(\d+):(\d{2})$/.exec(c || '');
+    if (m) return { sec: +m[1] * 60 + +m[2], colon: true };
+    m = /^(\d+(?:\.\d+)?)$/.exec(c || '');
+    return m ? { sec: +m[1], colon: false } : null;
+  }
+  function fmtClock(sec, colon) {
+    if (!colon && sec < 60) return sec.toFixed(1);
+    const t = Math.max(0, Math.ceil(sec));
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  }
+  function clockNow(id) {
+    const o = clockObs[id];
+    if (!o) return null;
+    const run = (Date.now() - o.at) / 1000;
+    const cap = Math.min(20, Math.max(5, o.gap + 1));
+    if (!o.running || !o.moving || run >= cap + 4) return fmtClock(o.sec, o.colon);
+    return fmtClock(Math.max(0, o.sec - Math.min(run, cap)), o.colon);
+  }
+  function smoothClocks(st) {
+    const seen = new Set();
+    for (const g of Object.values(st.games || {})) {
+      if (!g || seen.has(g.id) || g.state !== 'in' || !countdown(g)) continue;
+      seen.add(g.id);
+      const p = parseClock(g.clock);
+      if (!p) continue;
+      const o = clockObs[g.id];
+      const running = /IN_PROGRESS/.test(g.statusName || 'STATUS_IN_PROGRESS') && !onBreakish(g);
+      if (!o || o.reading !== g.clock) {
+        // Learn the gap between readings while the clock runs (ignore long gaps: those were stoppages).
+        const gap = o && o.moving ? (Date.now() - o.at) / 1000 : null;
+        const learned = o ? (gap && gap < 25 ? o.gap * 0.7 + gap * 0.3 : o.gap) : 15;
+        clockObs[g.id] = { reading: g.clock, ...p, at: Date.now(), moving: !!o && running, running, gap: learned };
+      }
+      else o.running = running;
+      // Swap ESPN's reading for a marked one the page turns into a ticking <span>.
+      const mark = `${M0}${g.id}${M1}${clockNow(g.id)}${M2}`;
+      if (g.detail && g.detail.includes(g.clock)) g.detail = g.detail.replace(g.clock, mark);
+      g.clock = mark;
+    }
+    for (const id of Object.keys(clockObs)) if (!seen.has(id)) delete clockObs[id];
+  }
+  const onBreakish = (g) => /HALFTIME|END_PERIOD|INTERMISSION|DELAY|TIMEOUT/i.test(g.statusName || '') || /halftime|intermission|^end\b|end of/i.test(g.detail || '');
+  const MARK = new RegExp(`${M0}([^${M1}]*)${M1}([^${M2}]*)${M2}`, 'g');
+  function markClocks(root) {
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const hits = [];
+    while (walk.nextNode()) if (walk.currentNode.nodeValue.includes(M0)) hits.push(walk.currentNode);
+    for (const node of hits) {
+      const text = node.nodeValue;
+      if (node.parentNode && node.parentNode.closest && node.parentNode.closest('svg')) { node.nodeValue = text.replace(MARK, '$2'); continue; }
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      text.replace(MARK, (all, id, clock, at) => {
+        if (at > last) frag.appendChild(document.createTextNode(text.slice(last, at)));
+        const span = document.createElement('span');
+        span.className = 'lclock'; span.dataset.g = id; span.textContent = clock;
+        frag.appendChild(span);
+        last = at + all.length;
+        return all;
+      });
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.parentNode.replaceChild(frag, node);
+    }
+  }
+  new MutationObserver((list) => {
+    for (const m of list) for (const n of m.addedNodes) {
+      if (n.nodeType === 3 ? n.nodeValue.includes(M0) : n.nodeType === 1 && n.textContent.includes(M0)) markClocks(n.nodeType === 3 ? n.parentNode : n);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+  setInterval(() => {
+    for (const el of document.querySelectorAll('.lclock')) {
+      const v = clockNow(el.dataset.g);
+      if (v && el.textContent !== v) el.textContent = v;
+    }
+  }, 250);
+
   // ---- Takeovers ---------------------------------------------------------
   // Score and win takeovers arrive on the same delay as the scoreboard, so they land with your TV.
   // ?sound=0 keeps a screen quiet (only one screen in the room should play sound).
@@ -1624,7 +1711,7 @@
 
   function connect() {
     const es = new EventSource('/stream');
-    es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; render(); });
+    es.addEventListener('state', (e) => { state = JSON.parse(e.data); online = true; smoothClocks(state); render(); });
     es.addEventListener('media', (e) => { media = JSON.parse(e.data); lpTeam = null; sdKey = null; render(); });
     // The new score reaches the screen right after its event; wait a beat so the takeover shows it.
     es.addEventListener('game', (e) => { const ev = JSON.parse(e.data); setTimeout(() => onGameEvent(ev), 150); });

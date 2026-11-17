@@ -36,6 +36,10 @@
   <h1>Game Day: status</h1>
   <div class="meta" style="margin-bottom:6px"><a href="/calendar.html" style="color:#9fb5d9">Calendar: pick any game to watch</a></div>
   <div class="sub" id="summary">Connecting…</div>
+  <div class="controls">
+    <button id="sync" style="font-weight:700">Sync to score</button>
+    <span class="meta" id="syncmsg">Tap the moment a score happens on your TV. The delay is set from when the app saw that score.</span>
+  </div>
   <div class="row" id="games"></div>
   <div class="row" style="margin-top:16px">
     <div class="card"><strong>Feed</strong><div id="feed" class="meta">…</div></div>
@@ -91,6 +95,12 @@
         <div class="meta">${g.state === 'pre' && g.start ? new Date(g.start).toLocaleString() : ''}${g.broadcast ? ` · ${esc(g.broadcast)}` : ''}</div>
       </div>`).join('');
   }
+
+  $('sync').onclick = async () => {
+    const r = await fetch('/api/sync', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    $('syncmsg').textContent = r.ok ? `Synced to ${j.team} ${j.score}: delay is now ${j.delaySeconds}s.` : (j.error || 'Sync failed.');
+  };
 
   function connect() {
     const es = new EventSource('/stream');

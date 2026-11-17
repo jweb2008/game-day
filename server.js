@@ -172,8 +172,46 @@ async function pollOnce() {
   const watchedIds = new Set(Object.values(watched).map((g) => g.id));
   for (const [k, g] of Object.entries(games)) if (watchedIds.has(g.id)) delete all[k];
   await addStats(all);
+  noteScores(live.games, all);
   live = { at: new Date().toISOString(), games: all, ticker };
   buffer.push(live);
+}
+
+// ---- Sync to a score ---------------------------------------------------------
+// When each score first showed up in ESPN's feed (before the delay). Tapping "Sync" the moment
+// a score happens on your TV sets the delay to how long ago the app saw it, so the screens and
+// lights land with the TV. The score is the anchor; the clock is not (ESPN's clock lags in chunks).
+const scoreLog = []; // newest first: { id, key, team, score, at }
+function noteScores(before, after) {
+  const prev = new Map(Object.values(before || {}).map((g) => [g.id, g]));
+  for (const [key, g] of Object.entries(after)) {
+    const old = prev.get(g.id);
+    if (!old || g.state !== 'in') continue;
+    for (const side of ['home', 'away']) {
+      if (g[side] && old[side] && Number(g[side].score) > Number(old[side].score)) {
+        if (scoreLog.some((x) => x.id === g.id && x.team === g[side].abbr && x.score === g[side].score)) continue;
+        scoreLog.unshift({ id: g.id, key, league: g.league, team: g[side].abbr, score: g[side].score, at: Date.now() });
+      }
+    }
+  }
+  scoreLog.length = Math.min(scoreLog.length, 30);
+}
+
+// The score to sync to: the newest one in the game on the screens, else the newest anywhere,
+// as long as it's within the delay buffer.
+function syncTarget(gameId) {
+  const fresh = scoreLog.filter((x) => Date.now() - x.at <= 175 * 1000);
+  if (gameId) return fresh.find((x) => x.id === gameId || x.key === gameId) || null;
+  const pick = slotPick(shown ? followedGames(shown.games) : {});
+  const mainId = pick && shown && shown.games[pick.mode === 'break' ? pick.main : pick.key]?.id;
+  const feat = featured() && live.games[featured()]?.id;
+  return fresh.find((x) => x.id === mainId) || fresh.find((x) => x.id === feat) || fresh[0] || null;
+}
+
+function setDelay(seconds) {
+  config.delaySeconds = seconds;
+  saveLocal({ delaySeconds: seconds });
+  broadcast('state', screenState());
 }
 
 // ---- the watch list (games picked on the calendar) ---------------------
@@ -329,7 +367,9 @@ async function addStats(games) {
           summaryCache.set(game.id, { t: Date.now(), state: game.state, extra: readSummary(raw, game), raw });
         } catch (err) {
           console.error('summary error:', err.message);
-          if (cached) cached.t = Date.now(); // don't hammer ESPN while it's failing
+          // Don't hammer ESPN while it's failing (the feed is checked every 2 seconds in a game).
+          if (cached) cached.t = Date.now();
+          else summaryCache.set(game.id, { t: Date.now(), state: game.state, extra: null, raw: null });
         }
       }
     }
@@ -751,11 +791,22 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/delay' && req.method === 'POST') {
     const seconds = Number(url.searchParams.get('seconds'));
     if (!Number.isFinite(seconds) || seconds < 0 || seconds > 120) return json(res, 400, { error: 'seconds must be 0 to 120' });
-    config.delaySeconds = seconds;
-    saveLocal({ delaySeconds: seconds });
-    broadcast('state', screenState());
+    setDelay(seconds);
     return json(res, 200, { delaySeconds: seconds });
   }
+
+  // Tap the moment a score happens on your TV. ?game=<id> picks the game; otherwise the one on the screens.
+  if (url.pathname === '/api/sync' && req.method === 'POST') {
+    const hit = syncTarget(url.searchParams.get('game'));
+    if (!hit) return json(res, 404, { error: 'No score in the last 3 minutes to sync to. Tap right after a score shows on your TV.' });
+    const seconds = Math.min(120, Math.max(0, Math.round((Date.now() - hit.at) / 1000)));
+    setDelay(seconds);
+    // Home Assistant's Goal delay slider follows, which also saves it for the stream you picked.
+    sendToHA({ type: 'delay', seconds, team: hit.team, league: hit.league });
+    console.log(`sync: ${hit.team} ${hit.score} seen ${seconds}s ago, delay is now ${seconds}s`);
+    return json(res, 200, { delaySeconds: seconds, team: hit.team, score: hit.score });
+  }
+  if (url.pathname === '/api/sync') return json(res, 200, { scores: scoreLog.filter((x) => Date.now() - x.at <= 175 * 1000).map((x) => ({ ...x, ago: Math.round((Date.now() - x.at) / 1000) })) });
 
   if (url.pathname === '/api/leagues') return json(res, 200, { sports: SPORTS.map(([key, name]) => ({ key, name })), leagues: LEAGUES.map(({ key, name, sport, kind }) => ({ key, name, sport, kind })) });
 
