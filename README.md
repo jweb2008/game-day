@@ -94,3 +94,12 @@ up to 90 minutes. Back to back (under 15 minutes): straight to the next game's p
 Followed teams always get a slot of their own (it holds that team's current or next game), so their
 games come up without a calendar pick. Empty a team's slot on the dashboard and it stays out until
 you add it back.
+
+## Scorers and scoring plays
+
+Score takeovers show who scored, with a headshot and the play ("Rhamondre Stevenson, 12-yd run";
+hockey: "goal 5 · wrist shot · from Pastrnak, McAvoy"), from ESPN's scoring plays. The app re-reads
+the game summary the moment a score shows up in the feed, so the scorer is known before the delayed
+takeover. Test buttons use your team's most recent real scorer when there is one. Football and hockey
+team TVs list the scoring plays so far under the team stats (newest first, never ahead of the delayed
+score); football TVs also show timeouts left under the score.

@@ -165,6 +165,22 @@
   .sd-score.scored { animation: scored 1.6s ease-out 1; }
   .sd-ball { width: 5vmin; height: 5vmin; border-radius: 50%; background: var(--sd-band); box-shadow: 0 0 0 1vmin rgba(255,255,255,.85); opacity: 0; transition: opacity .4s; }
   .sd-ball.on { opacity: 1; }
+  /* Timeouts left: one pip each, used ones hollow. */
+  .sd-to { display: flex; justify-content: center; align-items: center; gap: 1.6vmin; margin-top: 1vmin; font-size: 3vmin; letter-spacing: .3vmin; text-transform: uppercase; color: var(--muted); }
+  .sd-to i { width: 6vmin; height: 1.6vmin; border-radius: 1vmin; background: #f5f3ee; }
+  .sd-to i.used { background: transparent; box-shadow: inset 0 0 0 .3vmin rgba(255,255,255,.35); }
+  /* Scoring plays, newest first, under the team stats. */
+  .sc { margin: 2.4vmin 6vmin 0; color: #f5f3ee; }
+  .mid .sc, .middle .sc { margin: 2.4vmin 0 0; }
+  .sc h4 { margin: 0 0 1vmin; font-size: 3.2vmin; letter-spacing: .4vmin; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .sc-row { display: grid; grid-template-columns: 9vmin 1fr auto; align-items: center; gap: 2vmin; padding: 1vmin 0; border-top: .2vmin solid rgba(255,255,255,.08); }
+  .sc-row img { width: 9vmin; height: 9vmin; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.08); }
+  .sc-row .ph { width: 9vmin; height: 9vmin; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); font-weight: 800; font-size: 3vmin; }
+  .sc-row .t b { display: block; font-size: 4vmin; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-row .t span { display: block; font-size: 3.2vmin; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-row .s { text-align: right; font-size: 3.6vmin; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sc-row .s small { display: block; font-size: 2.8vmin; color: var(--muted); font-weight: 500; }
+  .sc-row.mine { box-shadow: inset .8vmin 0 0 var(--sd-band-bright, #f5f3ee); padding-left: 1.6vmin; }
   .sd-flag { text-align: center; font-size: 7vmin; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #f5f3ee; margin-top: 1vmin; }
   .sd-flag:empty { display: none; }
   .sd-flag.win { color: var(--sd-band-bright); }
@@ -444,7 +460,8 @@
   body.wide .tko .content > .logo, body.wide .tko .content > video { grid-column: 1; grid-row: 1 / span 3; margin: 0; }
   body.wide .tko .content > .logo { width: 62vmin; height: 62vmin; }
   body.wide .tko .content > video { width: 48vw; max-height: 80vh; }
-  body.wide .tko .word, body.wide .tko .line, body.wide .tko .small { grid-column: 2; justify-self: center; }
+  body.wide .tko .word, body.wide .tko .line, body.wide .tko .small, body.wide .tko .scorer { grid-column: 2; justify-self: center; }
+  body.wide .tko .content > .logo, body.wide .tko .content > video { grid-row: 1 / span 4; }
   body.wide .tko .line { margin-top: 5vmin; }
   body.wide .banner { top: auto; bottom: 8vmin; }
   body.wide .tko.anthem .content { display: flex; }
@@ -480,6 +497,14 @@
   @keyframes pop { from { transform: scale(.2) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
   .tko video { width: 100%; max-height: 62vmax; margin: 6vmin 0; background: #000; object-fit: contain; animation: rise .5s .2s both; }
   .tko .line { margin-top: 8vmin; font-size: 10vmin; font-weight: 800; display: flex; gap: 6vmin; font-variant-numeric: tabular-nums; animation: rise .5s .6s both; }
+  .tko .scorer { display: flex; align-items: center; gap: 3vmin; margin: 2vmin auto 1vmin; padding: 1.6vmin 3vmin 1.6vmin 1.6vmin; border-radius: 99vmin;
+    background: rgba(0,0,0,.28); max-width: 90%; animation: scorerIn .6s .5s both; }
+  .tko .scorer img { width: 15vmin; height: 15vmin; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.12); flex: none; }
+  .tko .scorer .who { text-align: left; min-width: 0; }
+  .tko .scorer b { display: block; font-size: 6.4vmin; font-weight: 800; line-height: 1.05; }
+  .tko .scorer span { display: block; font-size: 4.2vmin; opacity: .85; margin-top: .6vmin; }
+  .tko .scorer + .line { margin-top: 4vmin; }
+  @keyframes scorerIn { from { opacity: 0; transform: translateY(3vmin); } to { opacity: 1; transform: none; } }
   .tko .line .dim { opacity: .55; }
   .tko .small { font-size: 6vmin; font-weight: 600; opacity: .85; margin-top: 3vmin; letter-spacing: .08em; text-transform: uppercase; animation: rise .5s .8s both; }
   @keyframes rise { from { transform: translateY(6vmin); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -543,6 +568,7 @@
     <div class="status sd-status"></div>
     <div class="sd-hero"><div class="sd-tag"></div><img class="sd-logo" alt="" hidden onerror="this.hidden=true"><div class="sd-city"></div><div class="sd-name"></div><div class="sd-record"></div></div>
     <div class="sd-score-row"><span class="sd-ball"></span><span class="sd-score"></span><span class="sd-ball" style="visibility:hidden"></span></div>
+    <div class="sd-to" hidden></div>
     <div class="sd-flag"></div>
     <div class="sd-sit"></div>
     <div class="sd-mid"></div>
@@ -913,6 +939,24 @@
       `<div class="nu-when"><b>${esc(when)}</b>${esc(dayTime(x.start))}${x.broadcast ? ` · ${esc(x.broadcast)}` : ''}</div></div>`;
   }
 
+  // Scoring plays so far (newest first), only those the delayed score already shows, so the list
+  // never gets ahead of your TV. `mine` highlights one team's plays (the team TVs).
+  function scoringHTML(g, mineAbbr, max = 6) {
+    const shown = (g.scoring || []).filter((p) => !(Number.isFinite(p.away) && g.away && p.away > Number(g.away.score)) && !(Number.isFinite(p.home) && g.home && p.home > Number(g.home.score)));
+    if (!shown.length) return '';
+    const hockey = /hockey|nhl/.test(g.league);
+    const per = (n) => (hockey ? (n > 3 ? 'OT' : `P${n}`) : n > 4 ? 'OT' : `Q${n}`);
+    const rows = shown.slice(-max).reverse().map((p) => {
+      const who = p.scorer;
+      const pic = who && who.headshot ? `<img src="${esc(who.headshot)}" alt="" onerror="this.outerHTML='<span class=&quot;ph&quot;>${esc(p.team || '')}</span>'">` : `<span class="ph">${esc(p.team || '')}</span>`;
+      const title = who ? `${esc(who.short || who.name)}` : esc(p.type || 'Score');
+      const sub = [p.team, p.how || p.type].filter(Boolean).join(' · ');
+      const score = g.away && g.home && Number.isFinite(p.away) ? `${g.away.abbr} ${p.away}, ${g.home.abbr} ${p.home}` : '';
+      return `<div class="sc-row${mineAbbr && p.team === mineAbbr ? ' mine' : ''}">${pic}<div class="t"><b>${title}</b><span>${esc(sub)}</span></div><div class="s">${esc(score)}<small>${esc([p.period && per(p.period), p.clock].filter(Boolean).join(' '))}</small></div></div>`;
+    }).join('');
+    return `<div class="sc"><h4>Scoring</h4>${rows}</div>`;
+  }
+
   // Between games: the next game on the screens (from your slots), once this one is final.
   function upNextHTML(g) {
     const key = state && state.slot && state.slot.upNext;
@@ -988,7 +1032,7 @@
   function fitPlayers(el) {
     const panes = el.querySelectorAll ? [...el.querySelectorAll('.sd-pane')] : [];
     if (panes.length) { panes.forEach(fitPlayers); return; }
-    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .sp-card.compact:not(:first-of-type), .st-row:not(.head):not(.hl), .nx-row')];
+    const cards = [...el.querySelectorAll('.pg .pg-player, .mu-row, .mu-cmp:not(.head), .mu-note, .sd-stat, .bx-row:not(.head), .sp-card.compact:not(:first-of-type), .sc-row, .st-row:not(.head):not(.hl), .nx-row')];
     if (!cards.length) return;
     cards.forEach((c) => { c.style.display = ''; });
     const over = () => el.scrollHeight > el.clientHeight + 1;
@@ -996,6 +1040,8 @@
     // The "Players to watch" heading goes if every card under it had to go.
     const head = el.querySelector('.pg-player') ? el.querySelector('.pg h4:last-of-type') : null;
     if (head) head.style.display = el.querySelector('.pg-player:not([style*="none"])') ? '' : 'none';
+    const sc = el.querySelector('.sc');
+    if (sc) sc.style.display = sc.querySelector('.sc-row:not([style*="none"])') ? '' : 'none';
   }
 
   function middle(g) {
@@ -1014,6 +1060,7 @@
     }
     let html = '';
     html += statBars(g);
+    if (/nfl|football|cfl|ufl|hockey|nhl/.test(g.league)) html += scoringHTML(g, null, 4);
     html += '<div class="spacer"></div>';
     return html;
   }
@@ -1154,6 +1201,10 @@
       sdScore = t.score;
     }
     sd('.sd-ball').classList.toggle('on', g.state === 'in' && !!g.possession && g.possession === t.id);
+    const to = sd('.sd-to');
+    const left = g.state === 'in' && g.timeouts && /nfl|football|cfl|ufl/.test(g.league) ? g.timeouts[sideView] : null;
+    to.hidden = !Number.isFinite(left);
+    if (Number.isFinite(left)) to.innerHTML = 'TO ' + [0, 1, 2].map((i) => `<i${i < left ? '' : ' class="used"'}></i>`).join('');
     const flag = sd('.sd-flag');
     flag.className = 'sd-flag' + (won ? ' win' : '');
     flag.textContent = won ? 'Win' : lost ? 'Final' : '';
@@ -1184,13 +1235,18 @@
       }).join('') + '</div>';
     } else if ((g.stats || []).length || (g.drives && (g.drives.current || g.drives.last || g.drives.lastScore)) || (g.box && g.box[t.abbr])) {
       // This team's numbers; each bar is measured against the other team's.
-      const stats = '<div class="sd-stats">' + (g.stats || []).slice(0, 8).map((r) => {
+      let stats = '<div class="sd-stats">' + (g.stats || []).slice(0, 8).map((r) => {
         const mine = sideView === 'home' ? r.homeAmount : r.awayAmount;
         const max = Math.max(r.homeAmount, r.awayAmount) || 1;
         return `<div class="sd-stat"><span class="l">${esc(r.label)}</span><span class="v">${esc(sideView === 'home' ? r.home : r.away)}</span>` +
           `<div class="bar"><i style="width:${Math.round((mine / max) * 100)}%"></i></div></div>`;
       }).join('') + '</div>';
       const drive = sideDrive(g, t) || sideBox(g, t);
+      // Football and hockey: the scoring plays so far under the team stats (oldest drop first if it's tight).
+      if (/nfl|football|cfl|ufl|hockey|nhl/.test(g.league)) {
+        const sc = scoringHTML(g, t.abbr);
+        if (sc) stats += sc;
+      }
       mid = drive ? `<div class="sd-panes${panelShowsDrive(g, t) ? ' show-drive' : ''}"><div class="sd-pane stats">${stats}</div><div class="sd-pane drive">${drive}</div></div>` : stats;
     }
     setWithCountdown(sd('.sd-mid'), mid, g);
@@ -1556,6 +1612,14 @@
     return [c1, c2];
   }
 
+  // Who scored and how, under the word: headshot, name, "12-yd run" / "goal 5 · wrist shot · from Pastrnak".
+  function scorerHTML(play) {
+    const p = play && play.scorer;
+    if (!p) return '';
+    const pic = p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.remove()">` : '';
+    return `<div class="scorer">${pic}<div class="who"><b>${esc(p.name)}</b>${play.how ? `<span>${esc(play.how)}</span>` : ''}</div></div>`;
+  }
+
   function scoreLine(g) {
     if (!g || !g.away || !g.home) return '';
     const dim = (a, b) => (a.score < b.score ? ' class="dim"' : '');
@@ -1657,7 +1721,7 @@
       const small = moment === 'win' ? `<div class="small">${esc((us && us.name) || follow)} win · Final</div>` : '';
       html = (moment === 'goal' ? '<div class="beacon"></div>' : '<div class="stripes"></div>') +
         (moment === 'win' ? confettiHTML(colors) : '') +
-        `<div class="content">${found.video ? '' : visual}<div class="word" style="font-size:${size}vmin">${word}</div>${found.video ? visual : ''}${scoreLine(g)}${small}</div>` +
+        `<div class="content">${found.video ? '' : visual}<div class="word" style="font-size:${size}vmin">${word}</div>${found.video ? visual : ''}${scorerHTML(item.play)}${scoreLine(g)}${small}</div>` +
         '<div class="flash"></div>';
     }
     tkoEl.innerHTML = html;
@@ -1738,7 +1802,7 @@
     }
     if (ev.type === 'score' && cheer.includes(ev.team) && mine) {
       if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow, null, ev.team);
-      if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow, team: ev.team });
+      if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow, team: ev.team, play: ev.play });
     }
     if (ev.type === 'third' && mine && cheer.length) {
       if (cheer.includes(ev.offense)) return showBanner('third', '3rd down', ev.text, ev.follow, null, ev.offense);

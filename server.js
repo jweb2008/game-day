@@ -7,7 +7,7 @@ const path = require('path');
 const { fetchRoster, matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
-const { pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
+const { pickScoring, pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
 
 // The sport for a league key: your teams' leagues first, then the calendar's catalog.
@@ -210,6 +210,8 @@ function noteScores(before, after) {
       if (g[side] && old[side] && Number(g[side].score) > Number(old[side].score)) {
         if (scoreLog.some((x) => x.id === g.id && x.team === g[side].abbr && x.score === g[side].score)) continue;
         scoreLog.unshift({ id: g.id, key, league: g.league, team: g[side].abbr, score: g[side].score, at: Date.now() });
+        // Read the summary again on the next poll, so the scorer is known before the delayed takeover.
+        const c = summaryCache.get(g.id); if (c) c.t = 0;
       }
     }
   }
@@ -332,6 +334,7 @@ function readSummary(summary, game) {
     matchup: pickMatchup(summary),
     box: pickBox(summary, sportPath),
     drives: /football|nfl|cfl|ufl/.test(game.league) ? pickDrives(summary, people) : null,
+    scoring: pickScoring(summary, game, people, sportPath),
   };
 }
 
@@ -447,6 +450,7 @@ async function addStats(games) {
       game.standings = await standingsFor(game.league);
     }
     if (game.state !== 'pre' && extra.box && Object.keys(extra.box).length) game.box = extra.box;
+    if (game.state !== 'pre' && extra.scoring && extra.scoring.length) game.scoring = extra.scoring;
     // Upcoming games: the next five for each team before this game, the very next one after it.
     if (game.state === 'pre' || game.state === 'post') {
       const rows = game.state === 'post' ? await standingsFor(game.league) : game.standings;
@@ -495,6 +499,21 @@ function scoreKind(ev, game) {
   if (ev.points === 3) return 'fieldgoal';
   if (ev.points === 2) return Date.now() - (recentTD.get(key) || 0) < 5 * 60 * 1000 ? 'twopoint' : 'safety';
   return 'extrapoint';
+}
+
+// The scoring play behind a score event: the newest play for that team whose score is at or under
+// the score the screens now show. The summary is read ahead of the delay, so it's usually there.
+function scoringPlayFor(game, ev) {
+  const c = summaryCache.get(game.id);
+  const list = (c && c.extra && c.extra.scoring) || game.scoring || [];
+  const side = game.home && game.home.abbr === ev.team ? 'home' : 'away';
+  const mine = list.filter((p) => p.team === ev.team || p.side === side);
+  // A touchdown's play already counts the try after it (ESPN lists 7, the screens may still show 6).
+  const room = ev.points >= 6 ? 2 : 0;
+  const fits = mine.filter((p) => !Number.isFinite(p[side]) || p[side] <= Number(ev.score) + room);
+  const p = fits[fits.length - 1];
+  if (!p || (Number.isFinite(p[side]) && p[side] <= Number(ev.score) - Number(ev.points || 0))) return null; // older than this score
+  return { scorer: p.scorer, how: p.how, type: p.type };
 }
 
 function publish(event) {
@@ -671,7 +690,7 @@ function tickInner() {
       if (!following(abbr)) continue;
       for (const ev of diffGame(eventBase.games[abbr], game)) {
         const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
-        if (ev.type === 'score') event.kind = scoreKind(ev, game);
+        if (ev.type === 'score') { event.kind = scoreKind(ev, game); event.play = scoringPlayFor(game, ev); }
         const cheer = cheerTeams(abbr, game);
         const who = ev.type === 'score' ? ev.team : ev.type === 'final' ? ev.winner : ev.type === 'third' ? ev.offense : cheer[0];
         event.cheerTeams = cheer;
@@ -804,7 +823,11 @@ function takeover(type, team) {
   const game = shown && shown.games[follow];
   const us = game && [game.home, game.away].find((t) => t && t.abbr === follow);
   const base = { follow, game: game ? game.id : null, league: game ? game.league : null, at, test: true, cheerTeams: [follow], cheer: true, ...teamColors(us) };
-  if (POINTS[type]) return { ...base, type: 'score', kind: type, team: follow, points: POINTS[type] };
+  if (POINTS[type]) {
+    // Test buttons show your team's most recent real scorer when there is one (today's game, or the last).
+    const last = game && (game.scoring || []).filter((p) => p.team === follow && p.scorer).slice(-1)[0];
+    return { ...base, type: 'score', kind: type, team: follow, points: POINTS[type], play: last ? { scorer: last.scorer, how: last.how, type: last.type } : null };
+  }
   if (type === 'win') return { ...base, type: 'final', winner: follow };
   if (type === 'third' || type === 'defense') {
     const other = game && [game.home, game.away].find((t) => t && t.abbr !== follow);
