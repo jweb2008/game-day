@@ -97,9 +97,20 @@ you add it back.
 
 ## Scorers and scoring plays
 
-Score takeovers show who scored, with a headshot and the play ("Rhamondre Stevenson, 12-yd run";
-hockey: "goal 5 · wrist shot · from Pastrnak, McAvoy"), from ESPN's scoring plays. The app re-reads
-the game summary the moment a score shows up in the feed, so the scorer is known before the delayed
-takeover. Test buttons use your team's most recent real scorer when there is one. Football and hockey
-team TVs list the scoring plays so far under the team stats (newest first, never ahead of the delayed
-score); football TVs also show timeouts left under the score.
+A score's takeover and the lights go out the moment ESPN's scoreboard shows the score. Nothing waits
+for who scored. The app sends the scores first, then reads game summaries, standings and game logs.
+The scorer gets a player card instead: headshot, name, the play ("goal 5 · wrist shot · from
+Pastrnak, McAvoy") and their game so far ("2 G · 1 A · 5 SOG", "14 car · 82 yds · 1 TD"). It slides
+up about when the broadcast runs its first replay: `scorerCardSeconds` after the delayed score
+(default 20, set it in `config.local.json`). If a goal song is still playing, the card waits for it.
+It stays up for 12 seconds (`?cardsecs=` on a screen). It goes to the screens only. Home Assistant
+already got the score. Test buttons use your team's most recent real scorer when there is one.
+Football and hockey team TVs list the scoring plays so far under the team stats (newest first, never
+ahead of the delayed score). Football TVs also show timeouts left under the score.
+
+## Hockey goals: through the ice
+
+A hockey goal takeover starts as a sheet of ice over the screen. It cracks from one point, then
+shatters, and the pieces fly off to show the GOAL screen. There is a short ice-breaking sound unless
+the screen has `?sound=0`. Your own goal song still plays over it. `?ice=0` turns the ice off on a
+screen. The projector's logo page skips it.

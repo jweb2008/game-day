@@ -145,9 +145,12 @@ function tickerItems(sb, league) {
 async function pollOnce() {
   const games = {};
   const ticker = [];
-  for (const lg of leagues()) {
+  // Every league's scoreboard at once, so a goal never waits for another league's answer.
+  const boards = await Promise.all(leagues().map((lg) => fetchScoreboard(lg.sport, lg.league).then((sb) => ({ sb }), (err) => ({ err }))));
+  for (const [i, lg] of leagues().entries()) {
+    const { sb, err } = boards[i];
     try {
-      const sb = await fetchScoreboard(lg.sport, lg.league);
+      if (err) throw err;
       Object.assign(games, pickFollowed(sb, lg.league, lg.abbrs));
       ticker.push(...tickerItems(sb, lg.league));
       // Teams with no game today: show their next game from the season schedule.
@@ -171,11 +174,34 @@ async function pollOnce() {
   // A picked game that one of your teams is playing in: the calendar pick wins, so it isn't shown or celebrated twice.
   const watchedIds = new Set(Object.values(watched).map((g) => g.id));
   for (const [k, g] of Object.entries(games)) if (watchedIds.has(g.id)) delete all[k];
-  await addStats(all);
+  // Fast path: the scores go out now, with the last poll's stats and panels, so a goal (its takeover
+  // and the lights) never waits on summary, standings or game log downloads. Those come right after.
+  carryExtras(live.games, all);
   noteScores(live.games, all);
   noteFinals(live.games, all);
   live = { at: new Date().toISOString(), games: all, ticker };
+  pushLive();
+  await addStats(all);
+  live = { at: new Date().toISOString(), games: all, ticker };
+  pushLive();
+}
+
+// What addStats puts on a game. The fast snapshot borrows these from the last poll so panels don't blink.
+const EXTRAS = ['stats', 'form', 'leaders', 'matchup', 'spotlight', 'standings', 'box', 'scoring', 'upcoming', 'stars', 'drives'];
+function carryExtras(before, after) {
+  const prev = new Map(Object.values(before || {}).map((g) => [g.id, g]));
+  for (const g of Object.values(after)) {
+    const old = prev.get(g.id);
+    if (!old || old === g || old.state !== g.state) continue;
+    for (const k of EXTRAS) if (g[k] === undefined && old[k] !== undefined) g[k] = old[k];
+  }
+}
+
+// Into the delay buffer, and a tick timed for the moment it is due, instead of waiting for the next
+// once-a-second tick (at a 0 delay that is the moment it arrives).
+function pushLive() {
   buffer.push(live);
+  setTimeout(tick, Math.max(0, config.delaySeconds) * 1000 + 5);
 }
 
 // When each game went final, so the screens can hold the postgame (stats, stars, what's next)
@@ -516,7 +542,55 @@ function scoringPlayFor(game, ev) {
   return { scorer: p.scorer, how: p.how, type: p.type };
 }
 
+// ---- Player card at replay time ---------------------------------------------
+// A score's takeover goes out the moment the score shows, with no wait for who scored. The scorer
+// card follows about when the broadcast runs its first replay (scorerCardSeconds, default 20 s
+// after the delayed score), so it lands with the replay rather than holding up the goal.
+const CARD_KINDS = ['goal', 'touchdown', 'fieldgoal', 'safety'];
+function queueScorerCard(event) {
+  if (event.type !== 'score' || !CARD_KINDS.includes(event.kind)) return;
+  const after = Math.max(0, Number(config.scorerCardSeconds ?? 20)) * 1000;
+  const started = Date.now();
+  const attempt = () => {
+    const game = (shown && shown.games[event.follow]) || (live.games && live.games[event.follow]);
+    const play = event.test ? event.play : game && String(game.id) === String(event.game) ? scoringPlayFor(game, event) : null;
+    if (play && play.scorer) {
+      const card = { type: 'scorer', follow: event.follow, game: event.game, league: event.league, team: event.team, kind: event.kind,
+        cheerTeams: event.cheerTeams, test: event.test || undefined, play, line: game ? statLine(game, event.team, play.scorer) : '', at: new Date().toISOString() };
+      console.log('scorer card:', play.scorer.name, card.line);
+      return broadcast('game', card); // screens only: Home Assistant's lights already fired on the score
+    }
+    // ESPN hasn't named the scorer yet: keep looking for another minute, then let it go.
+    if (Date.now() - started < after + 60000) setTimeout(attempt, 3000);
+  };
+  setTimeout(attempt, after);
+}
+
+// The scorer's game so far, from the box score: "2 G · 1 A · 5 SOG", "14 car · 82 yds · 1 TD".
+function statLine(game, team, scorer) {
+  const box = game.box && game.box[team];
+  if (!box || !scorer) return '';
+  const same = (p) => p.name === scorer.name || (p.short && p.short === scorer.short);
+  const rows = (box.skaters || []).filter(same);
+  if (!rows.length) return '';
+  const n = (v) => (v == null || v === '' ? null : v);
+  if (game.league === 'nhl' || /hockey/.test(sportOf(game.league) || '')) {
+    const p = rows[0];
+    return [n(p.G) != null && `${p.G} G`, n(p.A) != null && `${p.A} A`, n(p.SOG) != null && `${p.SOG} SOG`].filter(Boolean).join(' · ');
+  }
+  const parts = [];
+  for (const r of rows) {
+    const s = r.s || {};
+    if (s['C/ATT'] != null) parts.push(`${s['C/ATT']} · ${s.YDS ?? 0} pass yds${s.TD ? ` · ${s.TD} TD` : ''}`);
+    else if (s.CAR != null) parts.push(`${s.CAR} car · ${s.YDS ?? 0} yds${s.TD ? ` · ${s.TD} TD` : ''}`);
+    else if (s.REC != null) parts.push(`${s.REC} rec · ${s.YDS ?? 0} yds${s.TD ? ` · ${s.TD} TD` : ''}`);
+    else if (s.FG != null) parts.push(`${s.FG} FG${s.LONG ? ` · long ${s.LONG}` : ''}`);
+  }
+  return parts.slice(0, 2).join('  ·  ');
+}
+
 function publish(event) {
+  queueScorerCard(event);
   recentEvents.unshift(event);
   recentEvents.length = Math.min(recentEvents.length, 50);
   console.log('event:', JSON.stringify(event));
