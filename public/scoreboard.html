@@ -251,13 +251,13 @@
 
   .slotnote { font-size: 3.6vmin; font-weight: 700; color: #111; background: #ffd166; padding: .6vmin 1.6vmin; border-radius: 1vmin; margin: 0 2vmin; white-space: nowrap; }
   .tickalert { position: absolute; left: 0; right: 0; bottom: 0; height: 11.2vmin; z-index: 8; display: flex; align-items: center; gap: 3vmin;
-    padding: 0 4vmin; background: #ffd166; color: #111; font-weight: 800; font-size: 5.4vmin; white-space: nowrap; overflow: hidden;
+    padding: 0 4vmin; background: #c8102e; border-top: .5vmin solid #fff; color: #fff; font-weight: 800; font-size: 6vmin; text-shadow: 0 .3vmin .6vmin rgba(0,0,0,.35); white-space: nowrap; overflow: hidden;
     animation: alert-in .35s ease-out both; }
   .tickalert[hidden] { display: none; }
-  .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #111; color: #ffd166; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
+  .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #fff; color: #c8102e; text-shadow: none; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
   .tickalert .sc { font-variant-numeric: tabular-nums; }
-  .tickalert .dim { opacity: .55; }
-  .tickalert small { font-size: 3.8vmin; font-weight: 600; opacity: .75; }
+  .tickalert .dim { opacity: .8; font-weight: 700; }
+  .tickalert small { font-size: 4.2vmin; font-weight: 800; margin-left: auto; }
   @keyframes alert-in { from { transform: translateY(100%); } }
   .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
   .slotdots i { width: 2vmin; height: 2vmin; border-radius: 50%; background: rgba(255,255,255,.3); }
