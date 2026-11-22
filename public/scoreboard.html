@@ -434,6 +434,12 @@
   .sd-drive-head.score { color: #ffd166; }
   .sd-field { margin: 2.4vmin 5vmin 0; aspect-ratio: 3 / 2; border-radius: 1.2vmin; overflow: hidden; }
   .sd-field svg { width: 100%; height: 100%; display: block; }
+  .sd-drive-last { display: flex; align-items: center; gap: 3vmin; margin: 2.4vmin 5vmin 0; }
+  .sd-drive-last .sd-drive-play { margin: 0; flex: 1; min-width: 0; }
+  .sd-faces { display: flex; gap: 1.6vmin; flex: none; }
+  .sd-face { width: 15vmin; text-align: center; }
+  .sd-face img, .sd-face i { display: block; width: 14vmin; height: 14vmin; margin: 0 auto; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.1); border: .4vmin solid rgba(255,255,255,.6); }
+  .sd-face span { display: block; margin-top: .6vmin; font-size: 2.8vmin; font-weight: 700; color: #f5f3ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sd-drive-play { margin: 2.4vmin 5vmin 0; font-size: 4.2vmin; font-weight: 600; line-height: 1.25; color: #f5f3ee;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
@@ -1405,6 +1411,13 @@
     return (phase === 0) === (sideView !== 'home');
   }
 
+  // Headshots of the players named in the last play (passer, receiver, tackler), as on the field view.
+  function sideFaces(play) {
+    const list = (play.players || []).slice(0, 3);
+    if (!list.length) return '';
+    return '<div class="sd-faces">' + list.map((p) => `<div class="sd-face">${p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.style.visibility='hidden'">` : '<i></i>'}<span>${esc(p.short || p.name)}</span></div>`).join('') + '</div>';
+  }
+
   function sideDrive(g, t) {
     if (!/nfl|football|cfl|ufl/.test(g.league) || !g.drives) return '';
     const d = g.drives;
@@ -1418,7 +1431,7 @@
     const title = scoring ? `Scoring drive · ${offense.abbr}` : `${offense.abbr} drive`;
     return `<div class="sd-drive-head${scoring ? ' score' : ''}">${esc(title)}<small>${esc(drive.description || '')}</small></div>` +
       `<div class="sd-field">${fieldSVG(g, drive, offense, defense, scoring, 800, true)}</div>` +
-      (last ? `<div class="sd-drive-play">${esc(last.text)}</div>` : '');
+      (last ? `<div class="sd-drive-last">${sideFaces(last)}<div class="sd-drive-play">${esc(last.text)}</div></div>` : '');
   }
 
   // Top bar on the team screens: the left (away) TV shows the period and clock; the right (home)
