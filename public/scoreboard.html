@@ -133,6 +133,33 @@
 
   .empty { margin: auto 6vmin; font-size: 7vmin; font-weight: 600; line-height: 1.15; color: var(--muted); }
 
+
+  /* Hockey goal: the alert smashes through a sheet of ice (drawn on a canvas, then removed). */
+  .tko .ice { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+  .tko.shatter .word span { animation-delay: .42s; }
+  .tko.shatter .word span + span { animation-delay: .6s; }
+  .tko.shatter .logo { animation-delay: .55s, 1.3s; }
+  .tko.shatter .line { animation-delay: .9s; }
+  .tko.shatter .flash { animation: flash .8s .36s ease-out both; }
+
+  /* Player card: who scored, about when the broadcast runs the replay. */
+  .pcard { position: absolute; left: 4vmin; right: 4vmin; bottom: 15vmin; z-index: 11; display: flex; align-items: center; gap: 4vmin;
+    padding: 3vmin 4vmin 3vmin 3vmin; border-radius: 3vmin; background: var(--t1); color: var(--t-ink); overflow: hidden;
+    box-shadow: 0 2vmin 6vmin rgba(0,0,0,.55); animation: pcard-in .6s cubic-bezier(.2,1.25,.4,1) both; }
+  .pcard[hidden] { display: none; }
+  .pcard.out { animation: pcard-out .45s ease-in forwards; }
+  @keyframes pcard-in { from { transform: translateY(40vmin); opacity: 0; } }
+  @keyframes pcard-out { to { transform: translateY(40vmin); opacity: 0; } }
+  .pcard .stripes { position: absolute; inset: -60%; background: repeating-linear-gradient(-30deg, var(--t1) 0 7vmin, var(--t2) 7vmin 14vmin); opacity: .14; }
+  .pcard img, .pcard .ph { position: relative; flex: none; width: 26vmin; height: 26vmin; border-radius: 50%; object-fit: cover; background: rgba(0,0,0,.25);
+    border: .8vmin solid rgba(255,255,255,.85); display: grid; place-items: center; font-size: 9vmin; font-weight: 800; }
+  .pcard .who { position: relative; min-width: 0; text-align: left; }
+  .pcard small { display: block; font-size: 3.6vmin; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
+  .pcard b { display: block; font-size: 8.4vmin; font-weight: 800; line-height: 1; margin-top: .8vmin; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pcard span { display: block; font-size: 4.6vmin; font-weight: 600; margin-top: 1.2vmin; opacity: .92; }
+  .pcard .stat { font-size: 5.2vmin; font-weight: 800; font-variant-numeric: tabular-nums; opacity: 1; }
+  body.wide .pcard { display: none; }
+
   @media (prefers-reduced-motion: reduce) {
     body { transition: none; }
     .score.scored { animation: none; }
@@ -224,13 +251,13 @@
 
   .slotnote { font-size: 3.6vmin; font-weight: 700; color: #111; background: #ffd166; padding: .6vmin 1.6vmin; border-radius: 1vmin; margin: 0 2vmin; white-space: nowrap; }
   .tickalert { position: absolute; left: 0; right: 0; bottom: 0; height: 11.2vmin; z-index: 8; display: flex; align-items: center; gap: 3vmin;
-    padding: 0 4vmin; background: #ffd166; color: #111; font-weight: 800; font-size: 5.4vmin; white-space: nowrap; overflow: hidden;
+    padding: 0 4vmin; background: #c8102e; border-top: .5vmin solid #fff; color: #fff; font-weight: 800; font-size: 6vmin; text-shadow: 0 .3vmin .6vmin rgba(0,0,0,.35); white-space: nowrap; overflow: hidden;
     animation: alert-in .35s ease-out both; }
   .tickalert[hidden] { display: none; }
-  .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #111; color: #ffd166; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
+  .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #fff; color: #c8102e; text-shadow: none; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
   .tickalert .sc { font-variant-numeric: tabular-nums; }
-  .tickalert .dim { opacity: .55; }
-  .tickalert small { font-size: 3.8vmin; font-weight: 600; opacity: .75; }
+  .tickalert .dim { opacity: .8; font-weight: 700; }
+  .tickalert small { font-size: 4.2vmin; font-weight: 800; margin-left: auto; }
   @keyframes alert-in { from { transform: translateY(100%); } }
   .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
   .slotdots i { width: 2vmin; height: 2vmin; border-radius: 50%; background: rgba(255,255,255,.3); }
@@ -407,6 +434,12 @@
   .sd-drive-head.score { color: #ffd166; }
   .sd-field { margin: 2.4vmin 5vmin 0; aspect-ratio: 3 / 2; border-radius: 1.2vmin; overflow: hidden; }
   .sd-field svg { width: 100%; height: 100%; display: block; }
+  .sd-drive-last { display: flex; align-items: center; gap: 3vmin; margin: 2.4vmin 5vmin 0; }
+  .sd-drive-last .sd-drive-play { margin: 0; flex: 1; min-width: 0; }
+  .sd-faces { display: flex; gap: 1.6vmin; flex: none; }
+  .sd-face { width: 15vmin; text-align: center; }
+  .sd-face img, .sd-face i { display: block; width: 14vmin; height: 14vmin; margin: 0 auto; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.1); border: .4vmin solid rgba(255,255,255,.6); }
+  .sd-face span { display: block; margin-top: .6vmin; font-size: 2.8vmin; font-weight: 700; color: #f5f3ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sd-drive-play { margin: 2.4vmin 5vmin 0; font-size: 4.2vmin; font-weight: 600; line-height: 1.25; color: #f5f3ee;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   /* ---- Logo page (?view=logo): the projector. Landscape, never turned. ---- */
@@ -580,6 +613,7 @@
   <div id="tickalert" class="tickalert" hidden></div>
   <div id="banner" class="banner" hidden></div>
   <div id="takeover" class="tko" hidden></div>
+  <div id="pcard" class="pcard" hidden></div>
 </div>
 
 <script>
@@ -699,7 +733,7 @@
     return `
       <section class="team ${side}${lost ? ' lost' : ''}${hasBall ? ' has-ball' : ''}" style="--band:${band};--band-ink:${inkFor(band)}">
         <span class="ball"></span>
-        ${logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
+        ${logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>'}
         <div class="who">
           ${city ? `<span class="city">${esc(city)}</span>` : ''}
           <span class="name">${esc(t.name)}</span>
@@ -848,7 +882,7 @@
       if (item === 'cut') return '<div class="st-cut"></div>';
       if (item === 'gap') return '<div class="st-row gap"><span>…</span></div>';
       const { r, rank } = item;
-      const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
+      const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>';
       return `<div class="st-row${hl.has(r.abbr) ? ' hl' : ''}"><span class="rk">${esc(rank)}</span>${pic}<span class="nm">${esc(r.abbr)}${r.clinch ? ` <small>${esc(r.clinch)}</small>` : ''}</span><span class="rec">${esc(r.record)}</span>${gr ? `<b class="gr">${esc(gamesLeft(r, g) ?? '')}</b>` : ''}<b>${esc(val(r))}</b></div>`;
     }).join('');
     return `<div class="st"><h4>${esc(title)}</h4><div class="st-row head"><span class="rk">#</span><span></span><span class="nm">Team</span><span class="rec">Record</span>${gr ? '<b class="gr">GR</b>' : ''}<b>${hockey ? 'PTS' : 'PCT'}</b></div>${rows}</div>`;
@@ -906,7 +940,7 @@
     return `${d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric', timeZone: tz() })} · ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}`;
   }
   function nextRow(x) {
-    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>';
     return `<div class="nx-row"><span class="when">${esc(dayTime(x.start))}</span><span class="at">${x.home ? 'vs' : '@'}</span>${pic}<span class="nm">${esc(x.opp.abbr)}</span><span class="rec">${esc(x.opp.record || '')}</span></div>`;
   }
   function scheduleOne(g, t) {
@@ -932,7 +966,7 @@
     if (!x) return '';
     const days = Math.round((new Date(x.start).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
     const when = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
-    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '';
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '';
     return `<div class="pg nextup"><h4>Up next for ${esc(t.name || t.abbr)}</h4>` +
       `<div class="nu-card">${pic}<div class="nu-txt"><b>${x.home ? 'vs' : '@'} ${esc(x.opp.name || x.opp.abbr)}</b>` +
       `<span>${esc(x.opp.record ? `${x.opp.abbr} ${x.opp.record}` : x.opp.abbr)}</span></div></div>` +
@@ -964,7 +998,7 @@
     if (!x || x.id === g.id || !x.start) return '';
     const mins = Math.max(0, Math.round((Date.parse(x.start) - Date.now()) / 60000));
     const inWords = mins < 60 ? `In ${mins} min` : mins < 24 * 60 ? `In ${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m` : dayTime(x.start);
-    const team = (t) => t ? `<div class="un-team">${t.logo ? `<img src="${esc(logoFor(t) || t.logo)}" alt="" onerror="this.style.visibility='hidden'">` : ''}<b>${esc(t.name || t.abbr)}</b><span>${esc(t.record || '')}</span></div>` : '';
+    const team = (t) => t ? `<div class="un-team">${t.logo ? `<img src="${esc(logoFor(t) || t.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : ''}<b>${esc(t.name || t.abbr)}</b><span>${esc(t.record || '')}</span></div>` : '';
     const body = x.kind === 'field' ? `<div class="un-field"><b>${esc(x.name || '')}</b></div>`
       : `<div class="un-teams">${team(x.away)}<span class="un-at">@</span>${team(x.home)}</div>`;
     return `<div class="pg nextup upnext"><h4>Up next on the screens</h4>${body}` +
@@ -1272,7 +1306,7 @@
     fdEl.querySelector('.fd-rows').innerHTML = rows.length ? rows.map((l, i) => `
       <div class="fd-row${from + i === 0 ? ' lead' : ''}">
         <span class="p">${esc(l.pos)}</span>
-        ${l.pic ? `<img src="${esc(l.pic)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
+        ${l.pic ? `<img src="${esc(l.pic)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>'}
         <span class="n">${esc(l.short || l.name)}</span>
         <span class="t">${esc(l.note)}</span>
         <span class="s">${esc(l.score)}</span>
@@ -1291,7 +1325,7 @@
   function giTeam(t, side, g) {
     if (!t) return '';
     const ball = g.state === 'in' && g.possession === t.id;
-    const pic = logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '';
+    const pic = logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '';
     const inner = side === 'away' ? `${pic}<span>${esc(t.abbr)}</span><span class="sc">${t.score}</span><span class="poss"></span>`
       : `<span class="poss"></span><span class="sc">${t.score}</span><span>${esc(t.abbr)}</span>${pic}`;
     return `<div class="gi-team ${side}${ball ? ' ball' : ''}">${inner}</div>`;
@@ -1377,6 +1411,13 @@
     return (phase === 0) === (sideView !== 'home');
   }
 
+  // Headshots of the players named in the last play (passer, receiver, tackler), as on the field view.
+  function sideFaces(play) {
+    const list = (play.players || []).slice(0, 3);
+    if (!list.length) return '';
+    return '<div class="sd-faces">' + list.map((p) => `<div class="sd-face">${p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.style.visibility='hidden'">` : '<i></i>'}<span>${esc(p.short || p.name)}</span></div>`).join('') + '</div>';
+  }
+
   function sideDrive(g, t) {
     if (!/nfl|football|cfl|ufl/.test(g.league) || !g.drives) return '';
     const d = g.drives;
@@ -1390,7 +1431,7 @@
     const title = scoring ? `Scoring drive · ${offense.abbr}` : `${offense.abbr} drive`;
     return `<div class="sd-drive-head${scoring ? ' score' : ''}">${esc(title)}<small>${esc(drive.description || '')}</small></div>` +
       `<div class="sd-field">${fieldSVG(g, drive, offense, defense, scoring, 800, true)}</div>` +
-      (last ? `<div class="sd-drive-play">${esc(last.text)}</div>` : '');
+      (last ? `<div class="sd-drive-last">${sideFaces(last)}<div class="sd-drive-play">${esc(last.text)}</div></div>` : '');
   }
 
   // Top bar on the team screens: the left (away) TV shows the period and clock; the right (home)
@@ -1612,14 +1653,6 @@
     return [c1, c2];
   }
 
-  // Who scored and how, under the word: headshot, name, "12-yd run" / "goal 5 · wrist shot · from Pastrnak".
-  function scorerHTML(play) {
-    const p = play && play.scorer;
-    if (!p) return '';
-    const pic = p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.remove()">` : '';
-    return `<div class="scorer">${pic}<div class="who"><b>${esc(p.name)}</b>${play.how ? `<span>${esc(play.how)}</span>` : ''}</div></div>`;
-  }
-
   function scoreLine(g) {
     if (!g || !g.away || !g.home) return '';
     const dim = (a, b) => (a.score < b.score ? ' class="dim"' : '');
@@ -1698,11 +1731,150 @@
     }
   }
 
+  // ---- Ice shatter (hockey goals) ----
+  // A frosted sheet over the takeover cracks from one impact point, then breaks into shards that fly
+  // off the screen. Canvas, not dozens of layers, so the TVs' small GPUs keep up.
+  function shatterIce(host) {
+    const W = host.clientWidth, H = host.clientHeight;
+    if (!W || !H) return;
+    const cv = document.createElement('canvas');
+    cv.className = 'ice'; cv.width = W; cv.height = H;
+    host.appendChild(cv);
+    const ctx = cv.getContext('2d');
+    const R = Math.hypot(W, H);
+    const cx = W * (0.44 + Math.random() * 0.12), cy = H * (0.36 + Math.random() * 0.1);
+    // Shards: wedges around the impact, cut into rings, each corner nudged so no two look alike.
+    const spokes = 14, rings = [0, 0.06, 0.16, 0.34, 0.62, 1.05].map((r) => r * R);
+    const ang = Array.from({ length: spokes }, (_, i) => ((i + 0.5 * Math.random()) / spokes) * Math.PI * 2);
+    const pt = (a, r) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+    const jit = rings.map((r, k) => ang.map(() => (k ? r * (0.85 + Math.random() * 0.3) : 0)));
+    const shards = [];
+    for (let k = 0; k < rings.length - 1; k++) {
+      for (let i = 0; i < spokes; i++) {
+        const j = (i + 1) % spokes, a1 = ang[i], a2 = ang[j] + (j === 0 ? Math.PI * 2 : 0);
+        const poly = k === 0 ? [[cx, cy], pt(a1, jit[1][i]), pt(a2, jit[1][j])]
+          : [pt(a1, jit[k][i]), pt(a1, jit[k + 1][i]), pt(a2, jit[k + 1][j]), pt(a2, jit[k][j])];
+        const mx = poly.reduce((s, p) => s + p[0], 0) / poly.length, my = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+        const dx = mx - cx, dy = my - cy, d = Math.hypot(dx, dy) || 1;
+        const speed = (0.75 - k * 0.08) * R * (0.7 + Math.random() * 0.6); // inner pieces fly hardest
+        shards.push({ poly, mx, my, vx: (dx / d) * speed, vy: (dy / d) * speed, spin: (Math.random() - 0.5) * 9, tint: 0.82 + Math.random() * 0.18 });
+      }
+    }
+    // Cracks: jagged lines out from the impact, plus a ring of hairlines.
+    const cracks = ang.map((a, i) => {
+      const pts = [[cx, cy]];
+      for (let r = R * 0.04; r < R * 0.75; r += R * (0.04 + Math.random() * 0.05)) pts.push(pt(a + (Math.random() - 0.5) * 0.12, r));
+      return pts;
+    });
+    const sheet = (x0, y0, x1, y1) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, 'rgba(232,246,255,0.94)'); g.addColorStop(0.5, 'rgba(196,226,246,0.9)'); g.addColorStop(1, 'rgba(238,248,255,0.95)');
+      return g;
+    };
+    const fill = sheet(0, 0, W, H);
+    // Skate scratches, drawn once and reused as a pattern so every shard carries its own bit of the ice.
+    const tex = document.createElement('canvas'); tex.width = W; tex.height = H;
+    const tx = tex.getContext('2d');
+    tx.fillStyle = fill; tx.fillRect(0, 0, W, H);
+    tx.strokeStyle = 'rgba(255,255,255,0.55)'; tx.lineWidth = Math.max(1, W / 500);
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() * W, y = Math.random() * H, len = (0.2 + Math.random() * 0.5) * W, a = -0.4 + Math.random() * 0.8;
+      tx.beginPath(); tx.moveTo(x, y); tx.quadraticCurveTo(x + len * 0.5, y + Math.sin(a) * len * 0.3, x + Math.cos(a) * len, y + Math.sin(a) * len); tx.stroke();
+    }
+    const pattern = ctx.createPattern(tex, 'no-repeat');
+    const CRACK = 320, FLY = 1100, t0 = performance.now();
+    const path = (poly) => { ctx.beginPath(); ctx.moveTo(poly[0][0], poly[0][1]); for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]); ctx.closePath(); };
+    const frame = (now) => {
+      const t = now - t0;
+      ctx.clearRect(0, 0, W, H);
+      if (t < CRACK) {
+        // Hit and crack: the sheet shudders, cracks run out from the impact.
+        const p = t / CRACK, shake = (1 - p) * W * 0.012;
+        ctx.save(); ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+        ctx.fillStyle = pattern; ctx.fillRect(-W * 0.05, -H * 0.05, W * 1.1, H * 1.1);
+        ctx.strokeStyle = 'rgba(70,120,160,0.85)'; ctx.lineWidth = Math.max(1.5, W / 320); ctx.lineJoin = 'round';
+        for (const c of cracks) {
+          const n = Math.max(2, Math.ceil(c.length * Math.min(1, p * 1.6)));
+          ctx.beginPath(); ctx.moveTo(c[0][0], c[0][1]); for (let i = 1; i < n; i++) ctx.lineTo(c[i][0], c[i][1]); ctx.stroke();
+        }
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.18);
+        glow.addColorStop(0, 'rgba(255,255,255,0.95)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = glow; ctx.fillRect(cx - W * 0.2, cy - W * 0.2, W * 0.4, W * 0.4);
+        ctx.restore();
+      } else {
+        // Break: every shard flies out and spins, falling a little, fading at the end.
+        const s = Math.min(1, (t - CRACK) / FLY), e = 1 - Math.pow(1 - s, 2.2), alpha = 1 - Math.pow(s, 1.6);
+        for (const sh of shards) {
+          ctx.save();
+          ctx.globalAlpha = alpha * sh.tint;
+          ctx.translate(sh.mx + sh.vx * e, sh.my + sh.vy * e + H * 0.35 * s * s);
+          ctx.rotate(sh.spin * e);
+          ctx.translate(-sh.mx, -sh.my);
+          path(sh.poly);
+          ctx.fillStyle = pattern; ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = Math.max(1, W / 450); ctx.stroke();
+          ctx.restore();
+        }
+      }
+      if (t < CRACK + FLY && cv.isConnected) requestAnimationFrame(frame); else cv.remove();
+    };
+    requestAnimationFrame(frame);
+    if (soundOn) iceSound(CRACK);
+  }
+
+  // A crack and a burst of breaking ice, made on the spot (no file needed). Under any goal horn you upload.
+  function iceSound(breakAt) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ac = iceSound.ac || (iceSound.ac = new AC());
+      if (ac.state === 'suspended') ac.resume();
+      const burst = (at, len, freq, gain) => {
+        const n = Math.floor(ac.sampleRate * len), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3) * (Math.random() < 0.08 ? 1 : 0.45);
+        const src = ac.createBufferSource(); src.buffer = buf;
+        const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = freq;
+        const g = ac.createGain(); g.gain.value = gain;
+        src.connect(hp); hp.connect(g); g.connect(ac.destination);
+        src.start(ac.currentTime + at);
+      };
+      burst(0, 0.09, 1800, 0.5);               // the hit
+      burst(breakAt / 1000, 0.7, 2600, 0.6);   // the sheet breaking
+      burst(breakAt / 1000 + 0.12, 0.5, 4200, 0.35);
+    } catch { /* no sound, no problem */ }
+  }
+
+  // ---- Player card: who scored, at replay time ----
+  const pcardEl = document.getElementById('pcard');
+  let pcardTimer = null;
+  function showPlayerCard(ev, tries = 0) {
+    if (logoView) return;
+    // A takeover still up (a long goal song): wait for it, then show the card.
+    if (current) { if (tries < 60) setTimeout(() => showPlayerCard(ev, tries + 1), 1000); return; }
+    const p = ev.play && ev.play.scorer;
+    if (!p) return;
+    const { us } = teamsFor(ev.follow, ev.team);
+    paint(pcardEl, us);
+    const initials = (p.name || '').split(' ').map((w) => w[0] || '').join('').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase();
+    const pic = p.headshot ? `<img src="${esc(p.headshot)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : `<div class="ph">${esc(initials)}</div>`;
+    const tag = { goal: 'Goal scorer', touchdown: 'Touchdown', fieldgoal: 'Field goal', safety: 'Safety' }[ev.kind] || 'Scoring play';
+    pcardEl.className = 'pcard';
+    pcardEl.innerHTML = `<div class="stripes"></div>${pic}<div class="who"><small>${esc(tag)}${p.pos ? ` · ${esc(p.pos)}` : ''}</small><b>${esc(p.name)}</b>` +
+      `${ev.play.how ? `<span>${esc(ev.play.how)}</span>` : ''}${ev.line ? `<span class="stat">${esc(ev.line)}</span>` : ''}</div>`;
+    pcardEl.hidden = false;
+    clearTimeout(pcardTimer);
+    pcardTimer = setTimeout(() => {
+      pcardEl.classList.add('out');
+      pcardTimer = setTimeout(() => { pcardEl.hidden = true; }, 450);
+    }, Math.max(4, Number(params.get('cardsecs')) || 12) * 1000);
+  }
+
   function showTakeover(item) {
     const { moment, follow } = item;
     const { g, us } = teamsFor(follow, item.team);
     const found = moment === 'anthem' ? findMedia('anthem', null) : findMedia(moment, item.team || follow, g && g.league);
-    tkoEl.className = 'tko' + (moment === 'anthem' ? ' anthem' : '') + (found.video ? ' has-video' : '');
+    const ice = moment === 'goal' && !logoView && params.get('ice') !== '0';
+    tkoEl.className = 'tko' + (moment === 'anthem' ? ' anthem' : '') + (found.video ? ' has-video' : '') + (ice ? ' shatter' : '');
     const colors = paint(tkoEl, us);
     let html;
     if (moment === 'anthem') {
@@ -1721,12 +1893,13 @@
       const small = moment === 'win' ? `<div class="small">${esc((us && us.name) || follow)} win · Final</div>` : '';
       html = (moment === 'goal' ? '<div class="beacon"></div>' : '<div class="stripes"></div>') +
         (moment === 'win' ? confettiHTML(colors) : '') +
-        `<div class="content">${found.video ? '' : visual}<div class="word" style="font-size:${size}vmin">${word}</div>${found.video ? visual : ''}${scorerHTML(item.play)}${scoreLine(g)}${small}</div>` +
+        `<div class="content">${found.video ? '' : visual}<div class="word" style="font-size:${size}vmin">${word}</div>${found.video ? visual : ''}${scoreLine(g)}${small}</div>` +
         '<div class="flash"></div>';
     }
     tkoEl.innerHTML = html;
     tkoEl.hidden = false;
     fitWord(tkoEl.querySelector('.word'));
+    if (ice) shatterIce(tkoEl);
 
     const [min, max] = LENGTH[moment] || [8000, 20000];
     const started = Date.now();
@@ -1804,6 +1977,7 @@
       if (ev.kind === 'twopoint') return showBanner('twopoint', '2-point', 'Conversion is good', ev.follow, null, ev.team);
       if (WORDS[ev.kind]) return startTakeover({ moment: ev.kind, follow: ev.follow, team: ev.team, play: ev.play });
     }
+    if (ev.type === 'scorer' && cheer.includes(ev.team) && mine) return showPlayerCard(ev);
     if (ev.type === 'third' && mine && cheer.length) {
       if (cheer.includes(ev.offense)) return showBanner('third', '3rd down', ev.text, ev.follow, null, ev.offense);
       return showBanner('defense', 'Defense', ev.text, ev.follow, 'defense', cheer[0]);
