@@ -130,6 +130,27 @@ async function nextFromSchedule(lg, abbr) {
   }
 }
 
+// Leagues shown on the ticker without following a team in them (config.tickerLeagues). Read at most
+// every 15 s: the ticker doesn't need the 2-second game-time pace, and it's one more ESPN request.
+const tickerBoards = new Map(); // league -> { t, items }
+const tickerOnlyLeagues = () => {
+  const followed = new Set(leagues().map((l) => l.league));
+  return (Array.isArray(config.tickerLeagues) ? config.tickerLeagues : []).filter((k) => !followed.has(k) && leagueInfo(k));
+};
+async function tickerOnly() {
+  const out = [];
+  await Promise.all(tickerOnlyLeagues().map(async (key) => {
+    const c = tickerBoards.get(key);
+    if (!c || Date.now() - c.t > 15000) {
+      const lg = leagueInfo(key);
+      try { tickerBoards.set(key, { t: Date.now(), items: tickerItems(await fetchScoreboard(lg.sport, key, { groups: lg.groups }), key) }); }
+      catch (err) { console.error(`ticker ${key}:`, err.message); if (c) c.t = Date.now(); else tickerBoards.set(key, { t: Date.now(), items: [] }); }
+    }
+  }));
+  for (const key of tickerOnlyLeagues()) out.push(...(tickerBoards.get(key)?.items || []));
+  return out;
+}
+
 // Every game in the leagues we follow, for the scrolling ticker.
 function tickerItems(sb, league) {
   return (sb.events || []).map((ev) => {
@@ -168,6 +189,8 @@ async function pollOnce() {
       ticker.push(...(live.ticker || []).filter((t) => t.league === lg.league));
     }
   }
+  // Leagues on the ticker only (config.tickerLeagues, e.g. NBA): their scores scroll along the bottom.
+  ticker.push(...(await tickerOnly()));
   // Games picked on the calendar come first, so on game day they win the screens.
   const watched = await pollWatched();
   const all = { ...watched, ...games };
@@ -781,6 +804,8 @@ function tickInner() {
     for (const t of next.ticker || []) {
       const b = before.get(t.id);
       if (!b || !b.away || !b.home || !t.away || !t.home) continue;
+      // Basketball and baseball score too often for an alert on every basket; they just scroll.
+      if (((leagueInfo(t.league) || {}).scoring || 'none') === 'none') continue;
       const da = t.away.score - b.away.score, dh = t.home.score - b.home.score;
       if (da > 0 || dh > 0) broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: da > 0 ? t.away.abbr : t.home.abbr });
     }

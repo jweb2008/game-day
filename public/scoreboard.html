@@ -111,6 +111,7 @@
   .ticker .tk .up { opacity: .55; }
   .ticker .tk em { font-style: normal; font-weight: 500; color: var(--muted); font-size: 3.8vmin; }
   .ticker .tk em.live { color: #ff8a8a; }
+  .ticker .tk .lg { font-style: normal; font-size: 3vmin; font-weight: 800; letter-spacing: .08em; padding: .3vmin 1vmin; border-radius: .6vmin; background: rgba(255,255,255,.14); align-self: center; }
 
   .stats { margin: 3vmin 5vmin 0; display: flex; flex-direction: column; gap: 1.6vmin; }
   .stat { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; row-gap: 0.9vmin; }
@@ -1142,6 +1143,9 @@
     const items = ((state && state.ticker) || []).filter((t) => t.id !== featuredId);
     const rank = { in: 0, pre: 1, post: 2 };
     items.sort((a, b) => rank[a.state] - rank[b.state] || Date.parse(a.start) - Date.parse(b.start));
+    // Several leagues on the ticker: tag each game with its league, so BOS the Bruins and BOS the Celtics don't blur.
+    const LG = { nfl: 'NFL', nhl: 'NHL', nba: 'NBA', mlb: 'MLB', wnba: 'WNBA' };
+    const many = new Set(items.map((t) => t.league)).size > 1;
     return items.map((t) => {
       let when;
       if (t.state === 'in') when = `<em class="live">${esc(t.detail)}</em>`;
@@ -1149,7 +1153,8 @@
       else when = `<em>${new Date(t.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}</em>`;
       const n = (side) => (t.state === 'pre' ? '' : `<span class="n">${side.score}</span>`);
       const loser = (me, other) => t.state === 'post' && me.score < other.score ? ' class="up"' : '';
-      return `<span class="tk"><b${loser(t.away, t.home)}>${esc(t.away.abbr)}</b>${n(t.away)}${t.state === 'pre' ? '<em>at</em>' : ''}<b${loser(t.home, t.away)}>${esc(t.home.abbr)}</b>${n(t.home)}${when}</span>`;
+      const tag = many ? `<i class="lg">${esc(LG[t.league] || String(t.league || '').toUpperCase())}</i>` : '';
+      return `<span class="tk">${tag}<b${loser(t.away, t.home)}>${esc(t.away.abbr)}</b>${n(t.away)}${t.state === 'pre' ? '<em>at</em>' : ''}<b${loser(t.home, t.away)}>${esc(t.home.abbr)}</b>${n(t.home)}${when}</span>`;
     }).join('');
   }
 
