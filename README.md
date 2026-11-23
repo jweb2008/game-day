@@ -73,8 +73,11 @@ Per-house overrides go in `config.local.json` next to `config.json` (not tracked
 The bottom ticker scrolls every game in the leagues of your teams, plus the leagues in
 `tickerLeagues` in `config.json` (NBA by default; add more by ESPN key, like `"mlb"` or `"wnba"`).
 Ticker-only leagues are read every 15 seconds. With more than one league on it, each game carries a
-small league tag. Basketball and baseball scores scroll but don't flash the score alert bar, since
-they change every few seconds.
+small league tag. Baseball scores scroll without an alert. Basketball alerts only for the moments
+that change a game (`lib/momentum.js`, tests in `test/`): a scoring run (outscoring the other team
+by 12 or more while scoring at least three times as much, like 12-0, 15-3 or 26-3, and again every
+10 more points of margin), and a lead change in the last two minutes of the 4th quarter or overtime.
+The alert bar reads "RUN · BOS on a 26-3 run" or "LEAD · BOS takes the lead".
 
 ## Game clock
 
