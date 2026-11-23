@@ -258,6 +258,7 @@
   .tickalert .tag { font-size: 3.6vmin; letter-spacing: .14em; background: #fff; color: #c8102e; text-shadow: none; padding: .6vmin 1.4vmin; border-radius: .8vmin; }
   .tickalert .sc { font-variant-numeric: tabular-nums; }
   .tickalert .dim { opacity: .8; font-weight: 700; }
+  .tickalert .nt { font-size: 5.6vmin; overflow: hidden; text-overflow: ellipsis; }
   .tickalert small { font-size: 4.2vmin; font-weight: 800; margin-left: auto; }
   @keyframes alert-in { from { transform: translateY(100%); } }
   .slotdots { display: inline-flex; gap: 1.2vmin; margin: 0 2vmin; align-items: center; }
@@ -2006,7 +2007,10 @@
     if (!a) { alertBusy = false; alertEl.hidden = true; return; }
     alertBusy = true;
     const side = (t) => `<span class="sc${t.abbr === a.scorer ? '' : ' dim'}">${esc(t.abbr)} ${t.score}</span>`;
-    alertEl.innerHTML = `<span class="tag">SCORE</span>${side(a.away)}${side(a.home)}<small>${esc(a.detail || '')}</small>`;
+    // A run or a lead change leads with what happened; the score comes after, smaller.
+    alertEl.innerHTML = a.note
+      ? `<span class="tag">${esc(a.tag || 'ALERT')}</span><span class="nt">${esc(a.note)}</span><small>${esc(`${a.away.abbr} ${a.away.score} · ${a.home.abbr} ${a.home.score}`)}</small>`
+      : `<span class="tag">SCORE</span>${side(a.away)}${side(a.home)}<small>${esc(a.detail || '')}</small>`;
     alertEl.hidden = false;
     alertEl.style.animation = 'none'; void alertEl.offsetWidth; alertEl.style.animation = '';
     setTimeout(nextAlert, 8000);

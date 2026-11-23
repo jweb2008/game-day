@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const { fetchRoster, matchesOf, normalizeField, fetchTeams, fetchScoreboard, fetchTeamSchedule, normalizeEvent, pickFollowed, pickFromSchedule } = require('./lib/espn');
 const { DelayBuffer, diffGame } = require('./lib/delay');
+const { Momentum } = require('./lib/momentum');
+const momentum = new Momentum();
 const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
 const { pickScoring, pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
@@ -156,7 +158,7 @@ function tickerItems(sb, league) {
   return (sb.events || []).map((ev) => {
     const g = normalizeEvent(ev, league);
     return {
-      id: g.id, league, state: g.state, detail: g.detail, start: g.start,
+      id: g.id, league, state: g.state, detail: g.detail, start: g.start, period: g.period, clock: g.clock,
       away: g.away ? { abbr: g.away.abbr, score: g.away.score } : null,
       home: g.home ? { abbr: g.home.abbr, score: g.home.score } : null,
     };
@@ -803,8 +805,16 @@ function tickInner() {
     const before = new Map((eventBase.ticker || []).map((t) => [t.id, t]));
     for (const t of next.ticker || []) {
       const b = before.get(t.id);
+      // Basketball: no alert per basket, only a big run or a late lead change (lib/momentum.js).
+      if ((leagueInfo(t.league) || {}).sport === 'basketball') {
+        for (const m of momentum.update(t)) {
+          console.log(`ticker ${m.kind}: ${m.text} (${t.away.abbr} ${t.away.score}, ${t.home.abbr} ${t.home.score}, ${t.detail})`);
+          broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: m.team, tag: m.kind === 'run' ? 'RUN' : 'LEAD', note: m.text });
+        }
+        continue;
+      }
       if (!b || !b.away || !b.home || !t.away || !t.home) continue;
-      // Basketball and baseball score too often for an alert on every basket; they just scroll.
+      // Baseball scores too often for an alert on every run; it just scrolls.
       if (((leagueInfo(t.league) || {}).scoring || 'none') === 'none') continue;
       const da = t.away.score - b.away.score, dh = t.home.score - b.home.score;
       if (da > 0 || dh > 0) broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: da > 0 ? t.away.abbr : t.home.abbr });
