@@ -68,6 +68,14 @@ A team's own file wins over the general one. Add `?sound=0` to any screen that s
 
 Per-house overrides go in `config.local.json` next to `config.json` (not tracked in git).
 
+## Ticker
+
+The bottom ticker scrolls every game in the leagues of your teams, plus the leagues in
+`tickerLeagues` in `config.json` (NBA by default; add more by ESPN key, like `"mlb"` or `"wnba"`).
+Ticker-only leagues are read every 15 seconds. With more than one league on it, each game carries a
+small league tag. Basketball and baseball scores scroll but don't flash the score alert bar, since
+they change every few seconds.
+
 ## Game clock
 
 ESPN only sends a new clock reading every 10 to 15 seconds. The screens count the clock down

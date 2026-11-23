@@ -4,6 +4,7 @@
   "delaySeconds": 12,
   "pollSeconds": 2,
   "idlePollSeconds": 60,
+  "tickerLeagues": ["nba"],
   "homeAssistant": {
     "url": "http://192.168.1.51",
     "webhook": "game_day_events"
