@@ -735,7 +735,7 @@
     return `
       <section class="team ${side}${lost ? ' lost' : ''}${hasBall ? ' has-ball' : ''}" style="--band:${band};--band-ink:${inkFor(band)}">
         <span class="ball"></span>
-        ${logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>'}
+        ${logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
         <div class="who">
           ${city ? `<span class="city">${esc(city)}</span>` : ''}
           <span class="name">${esc(t.name)}</span>
@@ -884,7 +884,7 @@
       if (item === 'cut') return '<div class="st-cut"></div>';
       if (item === 'gap') return '<div class="st-row gap"><span>…</span></div>';
       const { r, rank } = item;
-      const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>';
+      const pic = r.logo ? `<img src="${esc(r.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
       return `<div class="st-row${hl.has(r.abbr) ? ' hl' : ''}"><span class="rk">${esc(rank)}</span>${pic}<span class="nm">${esc(r.abbr)}${r.clinch ? ` <small>${esc(r.clinch)}</small>` : ''}</span><span class="rec">${esc(r.record)}</span>${gr ? `<b class="gr">${esc(gamesLeft(r, g) ?? '')}</b>` : ''}<b>${esc(val(r))}</b></div>`;
     }).join('');
     return `<div class="st"><h4>${esc(title)}</h4><div class="st-row head"><span class="rk">#</span><span></span><span class="nm">Team</span><span class="rec">Record</span>${gr ? '<b class="gr">GR</b>' : ''}<b>${hockey ? 'PTS' : 'PCT'}</b></div>${rows}</div>`;
@@ -942,7 +942,7 @@
     return `${d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric', timeZone: tz() })} · ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz() })}`;
   }
   function nextRow(x) {
-    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>';
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>';
     return `<div class="nx-row"><span class="when">${esc(dayTime(x.start))}</span><span class="at">${x.home ? 'vs' : '@'}</span>${pic}<span class="nm">${esc(x.opp.abbr)}</span><span class="rec">${esc(x.opp.record || '')}</span></div>`;
   }
   function scheduleOne(g, t) {
@@ -968,7 +968,7 @@
     if (!x) return '';
     const days = Math.round((new Date(x.start).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
     const when = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
-    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '';
+    const pic = x.opp.logo ? `<img src="${esc(x.opp.logo)}" alt="" onerror="this.style.visibility='hidden'">` : '';
     return `<div class="pg nextup"><h4>Up next for ${esc(t.name || t.abbr)}</h4>` +
       `<div class="nu-card">${pic}<div class="nu-txt"><b>${x.home ? 'vs' : '@'} ${esc(x.opp.name || x.opp.abbr)}</b>` +
       `<span>${esc(x.opp.record ? `${x.opp.abbr} ${x.opp.record}` : x.opp.abbr)}</span></div></div>` +
@@ -1000,7 +1000,7 @@
     if (!x || x.id === g.id || !x.start) return '';
     const mins = Math.max(0, Math.round((Date.parse(x.start) - Date.now()) / 60000));
     const inWords = mins < 60 ? `In ${mins} min` : mins < 24 * 60 ? `In ${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m` : dayTime(x.start);
-    const team = (t) => t ? `<div class="un-team">${t.logo ? `<img src="${esc(logoFor(t) || t.logo)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : ''}<b>${esc(t.name || t.abbr)}</b><span>${esc(t.record || '')}</span></div>` : '';
+    const team = (t) => t ? `<div class="un-team">${t.logo ? `<img src="${esc(logoFor(t) || t.logo)}" alt="" onerror="this.style.visibility='hidden'">` : ''}<b>${esc(t.name || t.abbr)}</b><span>${esc(t.record || '')}</span></div>` : '';
     const body = x.kind === 'field' ? `<div class="un-field"><b>${esc(x.name || '')}</b></div>`
       : `<div class="un-teams">${team(x.away)}<span class="un-at">@</span>${team(x.home)}</div>`;
     return `<div class="pg nextup upnext"><h4>Up next on the screens</h4>${body}` +
@@ -1312,7 +1312,7 @@
     fdEl.querySelector('.fd-rows').innerHTML = rows.length ? rows.map((l, i) => `
       <div class="fd-row${from + i === 0 ? ' lead' : ''}">
         <span class="p">${esc(l.pos)}</span>
-        ${l.pic ? `<img src="${esc(l.pic)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '<span></span>'}
+        ${l.pic ? `<img src="${esc(l.pic)}" alt="" onerror="this.style.visibility='hidden'">` : '<span></span>'}
         <span class="n">${esc(l.short || l.name)}</span>
         <span class="t">${esc(l.note)}</span>
         <span class="s">${esc(l.score)}</span>
@@ -1331,7 +1331,7 @@
   function giTeam(t, side, g) {
     if (!t) return '';
     const ball = g.state === 'in' && g.possession === t.id;
-    const pic = logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph',textContent:'${initials}'}))">` : '';
+    const pic = logoFor(t) ? `<img src="${esc(logoFor(t))}" alt="" onerror="this.style.visibility='hidden'">` : '';
     const inner = side === 'away' ? `${pic}<span>${esc(t.abbr)}</span><span class="sc">${t.score}</span><span class="poss"></span>`
       : `<span class="poss"></span><span class="sc">${t.score}</span><span>${esc(t.abbr)}</span>${pic}`;
     return `<div class="gi-team ${side}${ball ? ' ball' : ''}">${inner}</div>`;
