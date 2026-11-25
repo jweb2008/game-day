@@ -657,6 +657,47 @@ function broadcast(type, data) {
   for (const res of clients) send(res, type, data);
 }
 
+// ---- Doorbell ------------------------------------------------------------
+// Home Assistant saves a camera snapshot to /config/www/doorbell.jpg and calls POST /api/doorbell.
+// Game Day fetches that picture once (so the TVs never need to reach Home Assistant) and tells
+// every screen to show it in a corner card. It sits on top of the game; nothing else stops.
+// Turn it off with "doorbell": { "enabled": false } in config.local.json, or ?doorbell=0 on a screen.
+const doorbell = { image: null, type: 'image/jpeg', v: 0, at: null, lastError: null };
+
+async function ringDoorbell(imageUrl, label) {
+  const cfg = config.doorbell || {};
+  if (cfg.enabled === false) return { shown: false, reason: 'doorbell is turned off in config' };
+  // A second press within 10 seconds only refreshes the picture already on screen.
+  const src = imageUrl || cfg.image || (config.homeAssistant && config.homeAssistant.url
+    ? `${config.homeAssistant.url.replace(/\/$/, '')}/local/doorbell.jpg` : null);
+  let picture = false;
+  if (src && src !== 'none') {
+    try {
+      const r = await fetch(`${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`, { signal: AbortSignal.timeout(5000) });
+      if (!r.ok) throw new Error(`picture answered ${r.status}`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 8 * 1024 * 1024) throw new Error('picture is over 8 MB');
+      doorbell.image = buf;
+      doorbell.type = r.headers.get('content-type') || 'image/jpeg';
+      doorbell.v += 1;
+      doorbell.lastError = null;
+      picture = true;
+    } catch (err) {
+      doorbell.lastError = `${new Date().toISOString()} ${err.message}`;
+      console.error('doorbell picture:', err.message);
+    }
+  }
+  doorbell.at = new Date().toISOString();
+  const event = {
+    label: String(label || cfg.label || 'Front door').slice(0, 40),
+    picture: picture ? `/api/doorbell.jpg?v=${doorbell.v}` : null,
+    seconds: Math.max(5, Math.min(120, Number(cfg.seconds) || 30)),
+    at: doorbell.at,
+  };
+  broadcast('doorbell', event);
+  return { shown: true, screens: clients.size, ...event, pictureError: picture ? null : doorbell.lastError };
+}
+
 // Follow switches (set from Home Assistant): a team switched off is left off the screens and
 // sends no events. Teams never mentioned are followed.
 const following = (abbr) => abbr.startsWith('G') || !config.follow || config.follow[abbr] !== false;
@@ -1180,6 +1221,21 @@ const server = http.createServer((req, res) => {
     publish(event);
     return json(res, 200, event);
   }
+
+  // Doorbell (Home Assistant calls this on a press): POST /api/doorbell, optional ?image=<url>&label=Front%20door.
+  // ?image=none shows the card without a picture (for a quick test).
+  if (url.pathname === '/api/doorbell' && req.method === 'POST') {
+    ringDoorbell(url.searchParams.get('image'), url.searchParams.get('label'))
+      .then((out) => json(res, 200, out))
+      .catch((err) => json(res, 500, { error: err.message }));
+    return;
+  }
+  if (url.pathname === '/api/doorbell.jpg') {
+    if (!doorbell.image) return json(res, 404, { error: 'no doorbell picture yet' });
+    res.writeHead(200, { 'Content-Type': doorbell.type, 'Cache-Control': 'no-store' });
+    return res.end(doorbell.image);
+  }
+  if (url.pathname === '/api/doorbell') return json(res, 200, { at: doorbell.at, picture: !!doorbell.image, lastError: doorbell.lastError, enabled: (config.doorbell || {}).enabled !== false });
 
   if (url.pathname === '/api/media') return json(res, 200, { moments: MOMENTS, files: listMedia() });
   if (url.pathname.startsWith('/api/media/')) {

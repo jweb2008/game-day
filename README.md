@@ -42,6 +42,7 @@ bash /opt/game-day/update.sh
 | `POST /api/follow?team=NE&on=0` | Follow switch: an unfollowed team is left off the screens and sends no events (Home Assistant sets this) |
 | `POST /api/featured?team=KC` | Game picker: which followed team the screens show; `team=auto` for live first |
 | `POST /api/takeover?type=touchdown&team=KC` | Show a takeover now. Types: touchdown, fieldgoal, safety, twopoint, goal, win, third, defense, anthem, clear |
+| `POST /api/doorbell` | Doorbell: Game Day fetches Home Assistant's snapshot (`http://<homeAssistant.url>/local/doorbell.jpg`, or `?image=<url>`; `?image=none` for no picture) and every screen shows a "Front door" card with it for 30 seconds, over the game, with a chime on screens that have sound. The projector skips it (`?doorbell=1` to show it there), any screen can skip it with `?doorbell=0`, and `"doorbell": {"enabled": false}` in `config.local.json` turns it off. `GET /api/doorbell` shows the last ring and any picture error |
 | `GET /api/media`, `PUT`/`DELETE /api/media/KC-touchdown.mp4` | Sounds and videos for takeovers (the status page has an upload form) |
 
 ## Home Assistant
