@@ -7,5 +7,6 @@
   const q = new URLSearchParams(location.search);
   if (!q.has('bug')) q.set('bug', '0');
   q.set('view', 'logo');
+  if (!q.has('doorbell')) q.set('doorbell', '0'); // no doorbell picture on the ceiling unless ?doorbell=1
   location.replace('scoreboard.html?' + q.toString());
 </script>
