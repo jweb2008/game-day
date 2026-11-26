@@ -495,6 +495,45 @@
     animation: shadow 6s ease-in-out infinite alternate;
   }
   @keyframes shadow { from { transform: scaleX(1); opacity: .9; } to { transform: scaleX(.75); opacity: .5; } }
+  /* Battle (a game without one of your teams): both logos float on the ceiling and charge each other.
+     Away on the left, home on the right. The team ahead floats a little bigger; at the final the loser fades. ?duel=0 turns it off. */
+  .lp-duel { display: none; position: absolute; inset: 0; }
+  #logo-page.duel .lp-logo, #logo-page.duel .lp-shadow, #logo-page.duel .lp-sweep { display: none; }
+  #logo-page.duel .lp-duel { display: block; }
+  .lp-fighter { position: absolute; top: 50%; width: 56vmin; height: 56vmin; margin-top: -28vmin; animation: 14s ease-in-out infinite; }
+  .lp-fighter.a { left: 7vw; animation-name: duel-a; }
+  .lp-fighter.b { right: 7vw; animation-name: duel-b; }
+  .lp-fighter img { width: 100%; height: 100%; object-fit: contain; transition: transform 1.5s ease, opacity 1.5s ease; }
+  .lp-fighter.lead img { transform: scale(1.12); }
+  .lp-fighter.trail img { transform: scale(.88); }
+  .lp-fighter.out img { transform: scale(.8); opacity: .3; }
+  .lp-duel.over .lp-fighter, .lp-duel.over .lp-spark { animation-name: none; }
+  .lp-duel.over .lp-fighter.a { animation: float 6s ease-in-out infinite alternate; }
+  .lp-duel.over .lp-fighter.b { animation: float 6s ease-in-out -3s infinite alternate; }
+  @keyframes duel-a {
+    0%, 100% { transform: translate(0, -3vmin) rotate(-3deg); }
+    18% { transform: translate(2vw, 3vmin) rotate(2deg); }
+    36% { transform: translate(-1vw, -2vmin) rotate(-4deg); }
+    46% { transform: translate(-3vw, 0) rotate(-8deg); }
+    52% { transform: translate(12.5vw, 0) rotate(10deg); }
+    56% { transform: translate(8vw, -1vmin) rotate(-6deg); }
+    66% { transform: translate(2vw, 2vmin) rotate(3deg); }
+    84% { transform: translate(1vw, -3vmin) rotate(-2deg); }
+  }
+  @keyframes duel-b {
+    0%, 100% { transform: translate(0, 3vmin) rotate(3deg); }
+    18% { transform: translate(-2vw, -3vmin) rotate(-2deg); }
+    36% { transform: translate(1vw, 2vmin) rotate(4deg); }
+    46% { transform: translate(3vw, 0) rotate(8deg); }
+    52% { transform: translate(-12.5vw, 0) rotate(-10deg); }
+    56% { transform: translate(-8vw, 1vmin) rotate(6deg); }
+    66% { transform: translate(-2vw, -2vmin) rotate(-3deg); }
+    84% { transform: translate(-1vw, 3vmin) rotate(2deg); }
+  }
+  /* The clash: a white burst where they meet. */
+  .lp-spark { position: absolute; z-index: 2; left: 50%; top: 50%; width: 40vmin; height: 40vmin; margin: -20vmin 0 0 -20vmin; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, rgba(255,255,255,.6) 18%, transparent 62%); opacity: 0; animation: spark 14s linear infinite; }
+  @keyframes spark { 0%, 50.5% { opacity: 0; transform: scale(.3); } 52% { opacity: 1; transform: scale(1); } 57%, 100% { opacity: 0; transform: scale(1.6); } }
   .bug {
     position: absolute; right: 4vmin; bottom: 4vmin; padding: 1.6vmin 3vmin;
     display: flex; gap: 2.6vmin; align-items: baseline;
@@ -626,7 +665,7 @@
   <p id="play" class="play"></p>
   <div id="rest"></div>
   <div id="ticker" class="ticker"></div>
-  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="bug"></div></div>
+  <div id="logo-page"><div class="lp-sweep"></div><img class="lp-logo" alt="" hidden><div class="lp-shadow"></div><div class="lp-duel"><div class="lp-fighter a"><img alt=""></div><div class="lp-spark"></div><div class="lp-fighter b"><img alt=""></div></div><div class="bug"></div></div>
   <div id="tickalert" class="tickalert" hidden></div>
   <div id="banner" class="banner" hidden></div>
   <div id="takeover" class="tko" hidden></div>
@@ -1206,6 +1245,30 @@
     }
     lpBug.innerHTML = params.get('bug') === '0' || !g ? '' : bugHTML(g);
   }
+  // A game without one of your teams: both logos battle on the ceiling.
+  const lpDuel = lpEl.querySelector('.lp-duel');
+  const [lpA, lpB] = lpEl.querySelectorAll('.lp-fighter');
+  let duelKey = null;
+  function isFavoriteGame(g) {
+    return (state.favorites || []).some((f) => f.league === g.league && [g.away, g.home].some((t) => t && t.abbr === f.abbr));
+  }
+  function renderDuel(g) {
+    const key = `${g.id}:${logoFor(g.away)}:${logoFor(g.home)}`;
+    if (key !== duelKey) {
+      duelKey = key; lpTeam = null;
+      lpA.querySelector('img').src = logoFor(g.away) || '';
+      lpB.querySelector('img').src = logoFor(g.home) || '';
+    }
+    const a = Number(g.away.score), h = Number(g.home.score), on = g.state !== 'pre';
+    const over = g.state === 'post';
+    lpDuel.classList.toggle('over', over);
+    for (const [el, us, them] of [[lpA, a, h], [lpB, h, a]]) {
+      el.classList.toggle('lead', on && !over && us > them);
+      el.classList.toggle('trail', on && !over && us < them);
+      el.classList.toggle('out', over && us < them);
+    }
+    lpBug.innerHTML = params.get('bug') === '0' ? '' : bugHTML(g);
+  }
   function bugHTML(g) {
     if (!g.away || !g.home) return '';
     if (g.state === 'pre') {
@@ -1521,7 +1584,10 @@
     const football = /nfl|football|cfl|ufl/.test(g.league);
     document.body.classList.toggle('gridiron', fieldView && football && g.state !== 'pre');
     if (fieldView && football && g.state !== 'pre') return renderGridiron(g);
-    if (logoView) return renderLogo(featured, g);
+    const duel = logoView && !fieldView && params.get('duel') !== '0' && g.away && g.home && g.kind !== 'match' && !isFavoriteGame(g);
+    lpEl.classList.toggle('duel', !!duel);
+    if (duel) return renderDuel(g);
+    if (logoView) { duelKey = null; return renderLogo(featured, g); }
     if (sideView) return renderSide(g);
     document.body.style.setProperty('--field', darken(featured?.color, 0.16));
     document.body.style.setProperty('--accent', featured?.altColor || featured?.color || '#ffffff');

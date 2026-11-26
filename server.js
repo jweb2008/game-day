@@ -815,6 +815,7 @@ function screenState() {
     at: shown ? shown.at : null,
     games,
     featured: featured(),
+    favorites: config.teams.map((t) => ({ league: t.league, abbr: t.abbr })), // projector: a game without one of these is a two-logo battle
     slot: slotPick(games),
     ticker: shown ? shown.ticker || [] : [],
   };
