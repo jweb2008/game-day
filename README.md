@@ -120,6 +120,18 @@ already got the score. Test buttons use your team's most recent real scorer when
 Football and hockey team TVs list the scoring plays so far under the team stats (newest first, never
 ahead of the delayed score). Football TVs also show timeouts left under the score.
 
+## Hockey goals: the NHL's own feed
+
+ESPN's free feed runs well behind the broadcast, so during an NHL game the app also reads the
+NHL's live scores (api-web.nhle.com) at the same moment as ESPN, every poll. Whichever has the goal
+first raises the score, and the takeover, lights and Home Assistant event go out then. The goal only
+fires once, even when ESPN catches up later. A goal the NHL feed shows and then takes back on review
+comes off after three reads. Scorer, clock, stats and finals still come from ESPN. The status page
+JSON (/api/status) shows `nhlFeed` with the last error and the last goal the NHL feed had before ESPN.
+Turn it off with `"nhlFeed": false` in config.local.json.
+
+`tools/feedrace.js` times the two feeds against each other during a game without touching the app.
+
 ## Hockey goals: through the ice
 
 A hockey goal takeover starts as a sheet of ice over the screen. It cracks from one point, then
