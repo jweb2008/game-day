@@ -8,6 +8,8 @@ const { fetchRoster, matchesOf, normalizeField, fetchTeams, fetchScoreboard, fet
 const { DelayBuffer, diffGame } = require('./lib/delay');
 const { Momentum } = require('./lib/momentum');
 const momentum = new Momentum();
+const { fetchNhlScores, NhlOverlay } = require('./lib/nhl');
+const nhlOverlay = new NhlOverlay();
 const { fetchSummary, fetchGamelog, fetchStandings, pickStats } = require('./lib/stats');
 const { pickScoring, pickStars, pickBox, pickStandings, pickLastFive, pickMatchup, pickForm, pickLeaders, pickPeople, pickDrives } = require('./lib/summary');
 const { LEAGUES, SPORTS, league: leagueInfo } = require('./lib/leagues');
@@ -165,11 +167,29 @@ function tickerItems(sb, league) {
   }).filter((t) => t.away && t.home);
 }
 
+// The NHL feed is read only while an NHL game is on or about to start (config "nhlFeed": false turns it off).
+// It is started at the same moment as the ESPN scoreboards, so it never slows the poll down.
+let nhlFeedError = null;
+let nhlLastSeenFirst = null; // the last goal the NHL feed had before ESPN, for the status page
+function nhlWanted() {
+  if (config.nhlFeed === false) return false;
+  const soon = Date.now() + 30 * 60 * 1000;
+  return Object.values(live.games || {}).some((g) => g.league === 'nhl' && (g.state === 'in' || (g.state === 'pre' && g.start && Date.parse(g.start) < soon)));
+}
+function readNhl() {
+  return fetchNhlScores().then((m) => { nhlFeedError = null; return m; }, (err) => {
+    if (!nhlFeedError) console.error('nhl feed error:', err.message);
+    nhlFeedError = `${new Date().toISOString()} ${err.message}`;
+    return null;
+  });
+}
+
 async function pollOnce() {
   const games = {};
   const ticker = [];
   // Every league's scoreboard at once, so a goal never waits for another league's answer.
   const boards = await Promise.all(leagues().map((lg) => fetchScoreboard(lg.sport, lg.league).then((sb) => ({ sb }), (err) => ({ err }))));
+  const nhlRead = nhlWanted() ? readNhl() : null;
   for (const [i, lg] of leagues().entries()) {
     const { sb, err } = boards[i];
     try {
@@ -199,6 +219,14 @@ async function pollOnce() {
   // A picked game that one of your teams is playing in: the calendar pick wins, so it isn't shown or celebrated twice.
   const watchedIds = new Set(Object.values(watched).map((g) => g.id));
   for (const [k, g] of Object.entries(games)) if (watchedIds.has(g.id)) delete all[k];
+  // Hockey: the NHL's own feed, read alongside ESPN, raises a score as soon as either one has the goal.
+  if (nhlRead) {
+    const nhl = await nhlRead;
+    for (const a of nhlOverlay.apply(all, nhl)) {
+      nhlLastSeenFirst = { ...a, at: new Date().toISOString() };
+      console.log(`nhl feed: ${a.team} goal (${a.espn} -> ${a.nhl}) seen before ESPN`);
+    }
+  }
   // Fast path: the scores go out now, with the last poll's stats and panels, so a goal (its takeover
   // and the lights) never waits on summary, standings or game log downloads. Those come right after.
   carryExtras(live.games, all);
@@ -787,6 +815,7 @@ function screenState() {
     at: shown ? shown.at : null,
     games,
     featured: featured(),
+    favorites: config.teams.map((t) => ({ league: t.league, abbr: t.abbr })), // projector: a game without one of these is a two-logo battle
     slot: slotPick(games),
     ticker: shown ? shown.ticker || [] : [],
   };
@@ -1053,6 +1082,7 @@ const server = http.createServer((req, res) => {
       shownAt: shown ? shown.at : null,
       live: live.games,
       feedError: lastFeedError,
+      nhlFeed: { on: config.nhlFeed !== false, error: nhlFeedError, lastAheadOfEspn: nhlLastSeenFirst },
       screens: clients.size,
       homeAssistant: { url: config.homeAssistant?.url || null, ...haLink },
       events: recentEvents,
