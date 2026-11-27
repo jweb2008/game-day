@@ -38,8 +38,10 @@
   <div class="sub" id="summary">Connecting…</div>
   <div class="controls">
     <button id="sync" style="font-weight:700">Sync to score</button>
-    <span class="meta" id="syncmsg">Tap the moment a score happens on your TV. The delay is set from when the app saw that score.</span>
+    <button id="syncsport">Sync this sport only</button>
+    <span class="meta" id="syncmsg">Tap the moment a score happens on your TV. The delay is set from when the app saw that score. "This sport only" leaves the stream delay alone and sets just that sport's difference.</span>
   </div>
+  <div class="controls" id="bysport"></div>
   <div class="row" id="games"></div>
   <div class="row" style="margin-top:16px">
     <div class="card"><strong>Feed</strong><div id="feed" class="meta">…</div></div>
@@ -96,11 +98,32 @@
       </div>`).join('');
   }
 
-  $('sync').onclick = async () => {
-    const r = await fetch('/api/sync', { method: 'POST' });
+  async function sync(sportOnly) {
+    const r = await fetch('/api/sync' + (sportOnly ? '?sport=1' : ''), { method: 'POST' });
     const j = await r.json().catch(() => ({}));
-    $('syncmsg').textContent = r.ok ? `Synced to ${j.team} ${j.score}: delay is now ${j.delaySeconds}s.` : (j.error || 'Sync failed.');
-  };
+    $('syncmsg').textContent = !r.ok ? (j.error || 'Sync failed.')
+      : j.sport ? `Synced to ${j.team} ${j.score}: ${j.sport} is now ${j.sportDelay}s (stream delay ${j.delaySeconds}s, unchanged).`
+      : `Synced to ${j.team} ${j.score}: delay is now ${j.delaySeconds}s.`;
+  }
+  $('sync').onclick = () => sync(false);
+  $('syncsport').onclick = () => sync(true);
+
+  // Delay by sport: seconds on top of the stream delay (negative = sooner). Shown as the total too.
+  let editing = false;
+  function renderBySport(s) {
+    if (editing || !s.sportDelays) return;
+    const off = s.sportOffsets || {};
+    $('bysport').innerHTML = '<span class="meta">By sport, seconds added to the stream delay:</span> ' + Object.keys(s.sportDelays).map((sp) =>
+      `<label class="meta">${sp} <input type="number" step="1" min="-120" max="120" value="${off[sp] || 0}" data-sport="${sp}" style="width:56px"> = ${s.sportDelays[sp]}s</label>`).join(' ');
+    for (const el of $('bysport').querySelectorAll('input')) {
+      el.onfocus = () => { editing = true; };
+      el.onchange = async () => {
+        editing = false;
+        await fetch(`/api/delay?sport=${el.dataset.sport}&offset=${Number(el.value) || 0}`, { method: 'POST' });
+      };
+      el.onblur = () => { editing = false; };
+    }
+  }
 
   function connect() {
     const es = new EventSource('/stream');
@@ -108,6 +131,7 @@
       const s = JSON.parse(e.data);
       $('summary').textContent = `Showing data ${s.delaySeconds}s behind the live feed, to match your TV.`;
       renderGames(s);
+      renderBySport(s);
     });
     es.onerror = () => { $('summary').textContent = 'Lost connection to the server, retrying…'; };
   }
