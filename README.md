@@ -120,6 +120,19 @@ already got the score. Test buttons use your team's most recent real scorer when
 Football and hockey team TVs list the scoring plays so far under the team stats (newest first, never
 ahead of the delayed score). Football TVs also show timeouts left under the score.
 
+## Delay by sport
+
+The main delay comes from the stream picked in Home Assistant (its Goal delay slider and stream
+presets). Each sport can add or take off seconds on top of it, because the feeds behind each sport
+differ: hockey goals come from the NHL's faster feed, football from ESPN. Switching streams still
+moves every sport, and each keeps its own difference.
+
+- Status page: "By sport, seconds added to the stream delay" boxes (negative is sooner), with each
+  sport's total next to it. Or `POST /api/delay?sport=hockey&offset=8` (0 clears it).
+- "Sync this sport only" (`POST /api/sync?sport=1`): tap the moment a score shows on your TV. That
+  sport's difference is set so it lands on that score; the main delay and HA's slider stay put.
+- Saved in `config.local.json` as `"sportOffsets": {"hockey": 8}`.
+
 ## Hockey goals: the NHL's own feed
 
 ESPN's free feed runs well behind the broadcast, so during an NHL game the app also reads the

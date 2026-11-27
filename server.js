@@ -254,7 +254,7 @@ function carryExtras(before, after) {
 // once-a-second tick (at a 0 delay that is the moment it arrives).
 function pushLive() {
   buffer.push(live);
-  setTimeout(tick, Math.max(0, config.delaySeconds) * 1000 + 5);
+  for (const d of delaysInUse()) setTimeout(tick, Math.max(0, d) * 1000 + 20);
 }
 
 // When each game went final, so the screens can hold the postgame (stats, stars, what's next)
@@ -312,6 +312,34 @@ function setDelay(seconds) {
   config.delaySeconds = seconds;
   saveLocal({ delaySeconds: seconds });
   broadcast('state', screenState());
+}
+
+// ---- Delay by sport ------------------------------------------------------
+// The main delay (delaySeconds) comes from the stream you picked in Home Assistant. Each sport can
+// add or take off seconds on top of it (config.sportOffsets, e.g. {"hockey": 8}), because the feeds
+// differ: hockey goals come from the NHL's faster feed, football from ESPN. Switching streams still
+// moves every sport, and each sport keeps its own difference.
+const SPORTS_WITH_DELAY = ['football', 'hockey', 'basketball', 'baseball', 'soccer'];
+function sportOffsets() {
+  const out = {};
+  for (const [k, v] of Object.entries(config.sportOffsets || {})) if (Number.isFinite(v) && v !== 0) out[k] = v;
+  return out;
+}
+function delayFor(sport) {
+  return Math.min(175, Math.max(0, config.delaySeconds + (sportOffsets()[sport] || 0)));
+}
+function delaysInUse() {
+  return [...new Set([config.delaySeconds, ...SPORTS_WITH_DELAY.map(delayFor)])];
+}
+function setSportOffset(sport, seconds) {
+  const all = sportOffsets();
+  if (!seconds) delete all[sport]; else all[sport] = seconds;
+  config.sportOffsets = all;
+  saveLocal({ sportOffsets: all });
+  broadcast('state', screenState());
+}
+function delayInfo() {
+  return { delaySeconds: config.delaySeconds, sportOffsets: sportOffsets(), sportDelays: Object.fromEntries(SPORTS_WITH_DELAY.map((sp) => [sp, delayFor(sp)])) };
 }
 
 // ---- the watch list (games picked on the calendar) ---------------------
@@ -810,6 +838,8 @@ function screenState() {
   const games = shown ? followedGames(shown.games) : {};
   return {
     delaySeconds: config.delaySeconds,
+    sportOffsets: sportOffsets(),
+    sportDelays: delayInfo().sportDelays,
     timeZone: config.timeZone || null,
     buffering: shown === null,
     at: shown ? shown.at : null,
@@ -821,9 +851,10 @@ function screenState() {
   };
 }
 
-// The newest snapshot events were worked out from. It only moves forward, so making the
-// delay longer (the screens step back in time) never replays a score a second time.
-let eventBase = null;
+// Per game (and ticker line): the newest snapshot events were worked out from. It only moves
+// forward, so making a delay longer (the screens step back in time) never replays a score.
+const eventBase = { games: new Map(), ticker: new Map() };
+let shownSig = null;
 
 // Who the room cheers for in a game: your team, or the side(s) you picked on the calendar.
 function cheerTeams(key, game) {
@@ -851,46 +882,64 @@ function tick() {
 }
 
 function tickInner() {
-  const next = buffer.at(config.delaySeconds * 1000);
-  if (!next || next === shown) return;
-  const forward = !eventBase || Date.parse(next.at) > Date.parse(eventBase.at);
-  if (eventBase && forward) {
-    for (const [abbr, game] of Object.entries(next.games)) {
-      if (!following(abbr)) continue;
-      for (const ev of diffGame(eventBase.games[abbr], game)) {
-        const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
-        if (ev.type === 'score') { event.kind = scoreKind(ev, game); event.play = scoringPlayFor(game, ev); }
-        const cheer = cheerTeams(abbr, game);
-        const who = ev.type === 'score' ? ev.team : ev.type === 'final' ? ev.winner : ev.type === 'third' ? ev.offense : cheer[0];
-        event.cheerTeams = cheer;
-        event.cheer = !!who && cheer.includes(who);
-        Object.assign(event, teamColors([game.home, game.away].find((t) => t && t.abbr === (event.cheer ? who : cheer[0])) || game.home));
-        if (abbr.startsWith('G')) event.label = game.name;
-        publish(event);
-      }
+  // One delayed snapshot per delay in use; each game (and ticker line) comes from its sport's.
+  const snaps = new Map(delaysInUse().map((d) => [d, buffer.at(d * 1000)]));
+  const sig = [...snaps.values()].map((x) => (x ? x.at : '-')).join('|');
+  if (![...snaps.values()].some(Boolean) || sig === shownSig) return;
+  shownSig = sig;
+  const games = {}, src = {}, ticker = [];
+  for (const [d, snap] of snaps) {
+    if (!snap) continue;
+    for (const [key, game] of Object.entries(snap.games)) {
+      if (delayFor(sportOf(game.league)) !== d) continue;
+      games[key] = game; src[key] = snap.at;
+    }
+    for (const t of snap.ticker || []) if (delayFor(sportOf(t.league)) === d) ticker.push({ ...t, srcAt: snap.at });
+  }
+  const main = snaps.get(config.delaySeconds) || [...snaps.values()].find(Boolean);
+  const next = { at: main.at, games, ticker };
+  // Events: a game's (or ticker line's) snapshot is compared with the last one it was compared to,
+  // and only when this one is newer, so a longer delay (stepping back in time) never replays a score.
+  for (const [abbr, game] of Object.entries(games)) {
+    const base = eventBase.games.get(abbr);
+    if (base && Date.parse(src[abbr]) <= Date.parse(base.at)) continue;
+    eventBase.games.set(abbr, { at: src[abbr], game });
+    if (!base || !following(abbr)) continue;
+    for (const ev of diffGame(base.game, game)) {
+      const event = { ...ev, follow: abbr, game: game.id, league: game.league, at: new Date().toISOString() };
+      if (ev.type === 'score') { event.kind = scoreKind(ev, game); event.play = scoringPlayFor(game, ev); }
+      const cheer = cheerTeams(abbr, game);
+      const who = ev.type === 'score' ? ev.team : ev.type === 'final' ? ev.winner : ev.type === 'third' ? ev.offense : cheer[0];
+      event.cheerTeams = cheer;
+      event.cheer = !!who && cheer.includes(who);
+      Object.assign(event, teamColors([game.home, game.away].find((t) => t && t.abbr === (event.cheer ? who : cheer[0])) || game.home));
+      if (abbr.startsWith('G')) event.label = game.name;
+      publish(event);
     }
   }
   // Score alerts for the ticker: any other game whose score went up since the last snapshot.
-  if (eventBase && forward) {
-    const before = new Map((eventBase.ticker || []).map((t) => [t.id, t]));
-    for (const t of next.ticker || []) {
-      const b = before.get(t.id);
-      // Basketball: no alert per basket, only a big run or a late lead change (lib/momentum.js).
-      if ((leagueInfo(t.league) || {}).sport === 'basketball') {
-        for (const m of momentum.update(t)) {
-          console.log(`ticker ${m.kind}: ${m.text} (${t.away.abbr} ${t.away.score}, ${t.home.abbr} ${t.home.score}, ${t.detail})`);
-          broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: m.team, tag: m.kind === 'run' ? 'RUN' : 'LEAD', note: m.text });
-        }
-        continue;
+  for (const t of ticker) {
+    const prev = eventBase.ticker.get(t.id);
+    if (prev && Date.parse(t.srcAt) <= Date.parse(prev.at)) continue;
+    eventBase.ticker.set(t.id, { at: t.srcAt, item: t });
+    if (!prev) continue;
+    const b = prev.item;
+    // Basketball: no alert per basket, only a big run or a late lead change (lib/momentum.js).
+    if ((leagueInfo(t.league) || {}).sport === 'basketball') {
+      for (const m of momentum.update(t)) {
+        console.log(`ticker ${m.kind}: ${m.text} (${t.away.abbr} ${t.away.score}, ${t.home.abbr} ${t.home.score}, ${t.detail})`);
+        broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: m.team, tag: m.kind === 'run' ? 'RUN' : 'LEAD', note: m.text });
       }
-      if (!b || !b.away || !b.home || !t.away || !t.home) continue;
-      // Baseball scores too often for an alert on every run; it just scrolls.
-      if (((leagueInfo(t.league) || {}).scoring || 'none') === 'none') continue;
-      const da = t.away.score - b.away.score, dh = t.home.score - b.home.score;
-      if (da > 0 || dh > 0) broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: da > 0 ? t.away.abbr : t.home.abbr });
+      continue;
     }
+    if (!b || !b.away || !b.home || !t.away || !t.home) continue;
+    // Baseball scores too often for an alert on every run; it just scrolls.
+    if (((leagueInfo(t.league) || {}).scoring || 'none') === 'none') continue;
+    const da = t.away.score - b.away.score, dh = t.home.score - b.home.score;
+    if (da > 0 || dh > 0) broadcast('alert', { id: t.id, league: t.league, detail: t.detail, away: t.away, home: t.home, scorer: da > 0 ? t.away.abbr : t.home.abbr });
   }
-  if (forward) eventBase = next;
+  if (eventBase.games.size > 300) eventBase.games.delete(eventBase.games.keys().next().value);
+  if (eventBase.ticker.size > 600) eventBase.ticker.delete(eventBase.ticker.keys().next().value);
   shown = next;
   broadcast('state', screenState());
 }
@@ -1076,6 +1125,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/status') {
     return json(res, 200, {
       delaySeconds: config.delaySeconds,
+      sportOffsets: sportOffsets(),
+      sportDelays: delayInfo().sportDelays,
       teams: config.teams.map((t) => ({ ...t, following: following(t.abbr) })),
       featured: featured(),
       liveAt: live.at,
@@ -1091,10 +1142,18 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/api/delay' && req.method === 'POST') {
-    const seconds = Number(url.searchParams.get('seconds'));
+    const sport = url.searchParams.get('sport');
+    const seconds = Number(url.searchParams.get(sport ? 'offset' : 'seconds') || 0);
+    if (sport) {
+      // ?sport=hockey&offset=8: hockey runs 8 s behind the main delay (negative is ahead; 0 clears it).
+      if (!SPORTS_WITH_DELAY.includes(sport)) return json(res, 400, { error: `sport must be one of ${SPORTS_WITH_DELAY.join(', ')}` });
+      if (!Number.isFinite(seconds) || Math.abs(seconds) > 120) return json(res, 400, { error: 'offset must be -120 to 120' });
+      setSportOffset(sport, Math.round(seconds));
+      return json(res, 200, delayInfo());
+    }
     if (!Number.isFinite(seconds) || seconds < 0 || seconds > 120) return json(res, 400, { error: 'seconds must be 0 to 120' });
     setDelay(seconds);
-    return json(res, 200, { delaySeconds: seconds });
+    return json(res, 200, delayInfo());
   }
 
   // Tap the moment a score happens on your TV. ?game=<id> picks the game; otherwise the one on the screens.
@@ -1102,6 +1161,14 @@ const server = http.createServer((req, res) => {
     const hit = syncTarget(url.searchParams.get('game'));
     if (!hit) return json(res, 404, { error: 'No score in the last 3 minutes to sync to. Tap right after a score shows on your TV.' });
     const seconds = Math.min(120, Math.max(0, Math.round((Date.now() - hit.at) / 1000)));
+    const sport = sportOf(hit.league);
+    // "This sport only" (?sport=1): the main delay (and HA's slider) stay put, and this sport's
+    // difference from it is set so its delay lands on this score.
+    if (url.searchParams.get('sport') === '1') {
+      setSportOffset(sport, seconds - config.delaySeconds);
+      console.log(`sync: ${hit.team} ${hit.score} seen ${seconds}s ago, ${sport} is now ${seconds - config.delaySeconds}s off the main delay`);
+      return json(res, 200, { ...delayInfo(), sport, sportDelay: delayFor(sport), team: hit.team, score: hit.score });
+    }
     setDelay(seconds);
     // Home Assistant's Goal delay slider follows, which also saves it for the stream you picked.
     sendToHA({ type: 'delay', seconds, team: hit.team, league: hit.league });
@@ -1296,6 +1363,6 @@ try { migrateMedia(); } catch (err) { console.error('media migration:', err.mess
 try { ensureFavorites(); } catch (err) { console.error('favorite slots:', err.message); }
 
 server.listen(port, () => {
-  console.log(`Game Day running on port ${port}, delay ${config.delaySeconds}s, following ${config.teams.map((t) => t.name).join(', ')}`);
+  console.log(`Game Day running on port ${port}, delay ${config.delaySeconds}s${Object.keys(sportOffsets()).length ? ` (by sport: ${JSON.stringify(sportOffsets())})` : ''}, following ${config.teams.map((t) => t.name).join(', ')}`);
   pollLoop();
 });
